@@ -4,6 +4,7 @@ Each command returns plain text lines. Nothing here prints a token or a key.
 """
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Callable
 from typing import Any
@@ -17,6 +18,8 @@ USAGE = ("Usage: /xbm sync [full] | /xbm status | /xbm list [N]\n"
          "  sync    pull new bookmarks from X (full: re-read all of them)\n"
          "  status  how many are stored, last syncs and their X API cost\n"
          "  list    the N most recent bookmarks (default 10)")
+
+TCO = re.compile(r"https?://t\.co/\S*")
 
 ApiFactory = Callable[[dict[str, Any]], XApi]
 DbFactory = Callable[[], sqlite3.Connection]
@@ -65,7 +68,7 @@ def _one_line(item: Item, width: int = 90) -> str:
     if item.article_title:
         head = f"[Article] {item.article_title}"
     else:
-        head = " ".join(item.text.split())
+        head = " ".join(TCO.sub("", item.text).split()) or "(media only)"
     if len(head) > width:
         head = head[: width - 1].rstrip() + "…"
     return head

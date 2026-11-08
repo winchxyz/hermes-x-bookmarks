@@ -207,3 +207,21 @@ def test_cli_parser_has_new_subcommands():
     ns = parser.parse_args(["sync", "--full", "--max-pages", "2"])
     assert ns.xbm_cmd == "sync" and ns.full and ns.max_pages == 2
     assert parser.parse_args(["list", "--limit", "5"]).limit == 5
+
+
+def test_list_drops_tco_links_and_cli_survives_cp1252(capsys, monkeypatch):
+    import io
+    import sys
+
+    db = Shared()
+    run = Store(db.factory()).start_run("full")
+    Store(db.factory()).save_page(run, [Item(id="1", url="u", author_username="a",
+                                             text="Nice ✨ https://t.co/abc tail")])
+    lines = commands.do_list(Store(db.factory()), 1)
+    assert "t.co" not in lines[0] and "Nice ✨ tail" in lines[0]
+
+    raw = io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(raw, encoding="cp1252"))
+    cli.say(lines[0])
+    sys.stdout.flush()
+    assert b"Nice ? tail" in raw.getvalue()

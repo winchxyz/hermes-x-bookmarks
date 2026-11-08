@@ -5,6 +5,7 @@ Run in your own terminal. Output names ids and counts, never a token.
 from __future__ import annotations
 
 import argparse
+import sys
 from collections.abc import Callable
 from typing import Any
 
@@ -41,6 +42,15 @@ def setup(parser: argparse.ArgumentParser) -> None:
             p.add_argument("--limit", type=int, default=10, help="How many (max 100)")
 
 
+def say(line: str) -> None:
+    """print() that survives a console without UTF-8 (Windows cp1252): emoji become '?'."""
+    try:
+        print(line)
+    except UnicodeEncodeError:
+        enc = getattr(sys.stdout, "encoding", None) or "ascii"
+        print(line.encode(enc, errors="replace").decode(enc, errors="replace"))
+
+
 def _overrides(args: argparse.Namespace) -> dict[str, Any]:
     return {"auth_backend": getattr(args, "backend", None),
             "xurl_app": getattr(args, "xurl_app", None)}
@@ -64,10 +74,10 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
             if cmd == "list":
                 words.append(str(args.limit))
             lines = commands.run(words, ctx=ctx, api_factory=build, db_factory=db_factory,
-                                 overrides=_overrides(args), log=print,
+                                 overrides=_overrides(args), log=say,
                                  max_pages=getattr(args, "max_pages", None))
             for line in lines:
-                print(line)
+                say(line)
             failed = lines and lines[0].startswith(("Sync failed", "X sign-in unavailable"))
             return 1 if failed else 0
         api = build(commands.config_of(ctx, _overrides(args)))
@@ -83,7 +93,7 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
             report = probe.run_probe(api, out, max_pages=max(1, int(args.max_pages)))
             print("")
             for line in probe.summary_lines(report):
-                print(line)
+                say(line)
             print(f"\nraw responses and report.json: {out}")
             return 0
         except auth.AuthUnavailable as exc:
