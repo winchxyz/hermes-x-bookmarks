@@ -11,6 +11,21 @@ tags: [x, twitter, bookmarks, notion, productivity]
 provides_tools: []
 provides_hooks: []
 optional_env:
+  # X sign-in, option 1 (simplest): OAuth 1.0a keys of your own X app (Keys and tokens page).
+  - name: XBM_X_API_KEY
+    description: "X app API Key (Consumer Key), from your app's Keys and tokens page"
+    url: "https://console.x.com"
+    secret: true
+  - name: XBM_X_API_SECRET
+    description: "X app API Key Secret (Consumer Secret)"
+    secret: true
+  - name: XBM_X_ACCESS_TOKEN
+    description: "Access Token of your own X account for this app (generate it after setting Read permission)"
+    secret: true
+  - name: XBM_X_ACCESS_TOKEN_SECRET
+    description: "Access Token Secret that goes with the Access Token"
+    secret: true
+  # X sign-in, option 2: OAuth 2.0 through Hermes (hermes auth add hermes-x-bookmarks:x).
   - name: XBM_X_CLIENT_ID
     description: "OAuth 2.0 Client ID of your own X developer app (Native App, read-only). Sign in with `hermes auth add hermes-x-bookmarks:x`."
     url: "https://console.x.com"
@@ -26,10 +41,10 @@ oauth:
 config_schema:
   auth_backend:
     type: str
-    default: "hermes"
-    choices: ["hermes", "xurl"]
+    default: "auto"
+    choices: ["auto", "keys", "hermes", "xurl"]
     label: "X sign-in"
-    description: "hermes: Hermes' own sign-in (hermes auth add hermes-x-bookmarks:x). xurl: the official X CLI you already signed in with (xurl token)."
+    description: "auto: keys when all four XBM_X_* keys are set, else hermes. keys: OAuth 1.0a keys of your own X app. hermes: Hermes' own sign-in (hermes auth add hermes-x-bookmarks:x). xurl: the official X CLI (xurl token)."
   xurl_app:
     type: str
     default: ""

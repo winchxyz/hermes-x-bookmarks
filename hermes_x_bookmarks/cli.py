@@ -17,8 +17,8 @@ def setup(parser: argparse.ArgumentParser) -> None:
     for name, help_text in (("whoami", "Check the X sign-in: print your X user id and handle"),
                             ("probe", "Day-1 spike: ask X how bookmarks and Articles come back")):
         p = sub.add_parser(name, help=help_text)
-        p.add_argument("--backend", choices=["hermes", "xurl"], default=None,
-                       help="X sign-in to use (default: the plugin setting, else hermes)")
+        p.add_argument("--backend", choices=["auto", "keys", "hermes", "xurl"], default=None,
+                       help="X sign-in to use (default: the plugin setting, else auto)")
         p.add_argument("--xurl-app", default=None, help="xurl app name (xurl backend only)")
         if name == "probe":
             p.add_argument("--max-pages", type=int, default=10,

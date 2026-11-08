@@ -106,6 +106,37 @@ def test_hermes_transport_outside_hermes_says_how_to_sign_in():
         auth.HermesTransport().get("https://api.x.com/2/users/me")
 
 
+KEYS = {"XBM_X_API_KEY": "ck", "XBM_X_API_SECRET": "cs", "XBM_X_ACCESS_TOKEN": "tk",
+        "XBM_X_ACCESS_TOKEN_SECRET": "ts"}
+
+
 def test_make_transport_picks_backend():
-    assert auth.make_transport({}).name == "hermes"
+    assert auth.make_transport({}, environ={}).name == "hermes"
+    assert auth.make_transport({}, environ=KEYS).name == "keys"
+    assert auth.make_transport({"auth_backend": "hermes"}, environ=KEYS).name == "hermes"
     assert auth.make_transport({"auth_backend": "xurl", "xurl_app": "a"}).name == "xurl"
+
+
+def test_keys_transport_names_missing_keys_never_values():
+    partial = {**KEYS, "XBM_X_ACCESS_TOKEN_SECRET": ""}
+    with pytest.raises(auth.AuthUnavailable) as exc:
+        auth.KeysTransport(environ=partial).get("https://api.x.com/2/users/me")
+    assert "XBM_X_ACCESS_TOKEN_SECRET" in str(exc.value)
+    assert "ck" not in str(exc.value).replace("XBM", "")
+
+
+def test_keys_transport_signs_with_oauth1(monkeypatch):
+    import httpx
+
+    seen = {}
+
+    def fake_get(url, headers, timeout, follow_redirects):
+        seen["auth"] = headers["Authorization"]
+        return httpx.Response(200, json={"data": {"id": "1"}})
+
+    monkeypatch.setattr(httpx, "get", fake_get)
+    res = auth.KeysTransport(environ=KEYS).get("https://api.x.com/2/users/me?user.fields=id")
+    assert res.status == 200
+    assert seen["auth"].startswith("OAuth ")
+    assert 'oauth_consumer_key="ck"' in seen["auth"] and 'oauth_token="tk"' in seen["auth"]
+    assert "cs" not in seen["auth"].split("oauth_signature=")[0].replace("oauth_consumer", "")

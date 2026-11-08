@@ -1,8 +1,11 @@
 """Where the X bearer comes from. The plugin never stores a token (catalog rule 11).
 
-Two backends, both behind one call shape ``transport.get(url) -> HttpResult``:
+Three backends, all behind one call shape ``transport.get(url) -> HttpResult``:
 
-* ``hermes`` (default): Hermes' plugin OAuth. The user signs in once with
+* ``keys``: OAuth 1.0a user context with the four values from your own developer app (Keys and
+  tokens), stored in the Hermes profile's ``.env`` and read through Hermes' secret scope. No
+  browser sign-in and no callback URL. ``auto`` (default) picks it when all four are set.
+* ``hermes``: Hermes' plugin OAuth 2.0. The user signs in once with
   ``hermes auth add hermes-x-bookmarks:x``; Hermes keeps and refreshes the grant and attaches the
   bearer itself inside ``credentialed_provider_request``. This module never sees the token.
 * ``xurl``: the official X CLI. ``xurl token`` prints a fresh access token (refreshing it first if
@@ -129,9 +132,47 @@ class XurlTransport:
         return res
 
 
-def make_transport(config: Mapping[str, Any] | None = None) -> Transport:
+@dataclass
+class KeysTransport:
+    """OAuth 1.0a user context: each GET is signed with the owner's app keys (HMAC-SHA1)."""
+
+    timeout: float = 30.0
+    environ: Mapping[str, str] | None = None
+    name: str = field(default="keys", init=False)
+
+    def get(self, url: str) -> HttpResult:
+        import httpx
+
+        from . import oauth1, secrets
+
+        missing = secrets.missing_x_keys(self.environ)
+        if missing:
+            raise AuthUnavailable("Missing in the Hermes profile's .env: " + ", ".join(missing)
+                                  + ". Copy them from your X app's Keys and tokens page.")
+        keys = secrets.x_keys(self.environ)
+        header = oauth1.authorization_header(
+            "GET", url, consumer_key=keys["XBM_X_API_KEY"],
+            consumer_secret=keys["XBM_X_API_SECRET"], token=keys["XBM_X_ACCESS_TOKEN"],
+            token_secret=keys["XBM_X_ACCESS_TOKEN_SECRET"])
+        keys = {}
+        try:
+            r = httpx.get(url, headers={"Authorization": header}, timeout=self.timeout,
+                          follow_redirects=False)
+        except httpx.HTTPError as exc:
+            raise ConnectionError(f"X request failed ({type(exc).__name__})") from None
+        return HttpResult(r.status_code, dict(r.headers), r.content)
+
+
+def make_transport(config: Mapping[str, Any] | None = None,
+                   environ: Mapping[str, str] | None = None) -> Transport:
+    from . import secrets
+
     cfg = dict(config or {})
-    backend = str(cfg.get("auth_backend") or "hermes").strip().lower()
+    backend = str(cfg.get("auth_backend") or "auto").strip().lower()
+    if backend == "auto":
+        backend = "keys" if not secrets.missing_x_keys(environ) else "hermes"
+    if backend == "keys":
+        return KeysTransport(environ=environ)
     if backend == "xurl":
         return XurlTransport(app=str(cfg.get("xurl_app") or "").strip())
     return HermesTransport()
