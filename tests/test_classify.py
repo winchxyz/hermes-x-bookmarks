@@ -202,3 +202,13 @@ def test_commands_classify_status_list_and_register():
     assert ctx.config["about_me"] == "I build Hermes plugins"
     assert "I build Hermes plugins" in handler("about")
     assert "cleared" in handler("about clear") and ctx.config["about_me"] == ""
+
+
+def test_prompt_has_category_boundaries_and_keeps_about_me_out_of_labels():
+    text = classify.INSTRUCTIONS.format(
+        categories=classify.category_lines(("Crypto & web3", "My own topic")), language="English",
+        about=classify.about_block("I follow AI agents", "me"))
+    assert '- "Crypto & web3": tokens, chains' in text and "even when AI or bots" in text
+    assert '- "My own topic"' in text and '"My own topic":' not in text
+    assert "only to judge priority" in text and "never repeat it" in text
+    assert "do not restate who the person is" in text

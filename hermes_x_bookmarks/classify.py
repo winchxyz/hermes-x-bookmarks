@@ -19,7 +19,7 @@ from .reader import Item
 from .store import Store
 
 AUX_TASK = "xbm_classify"
-SCHEMA_VERSION = 2  # 2: per-block judging, about-me and own-handle hints
+SCHEMA_VERSION = 3  # 2: per-block judging, about-me, own handle; 3: category hints
 BATCH = 10
 MAX_FAILED_CALLS_IN_ROW = 3
 MAX_CHARS = 1500  # of body text per item sent to the model
@@ -39,10 +39,13 @@ detail, topic or guess from one block into another. When a block is too short to
 plainly what it literally is (for example "a Midjourney style reference code") instead of
 inventing a purpose.
 {about}
+Categories (choose by the bookmark's main subject, from its own content only):
+{categories}
+- "Other": none fits; put a short new category name in suggested_category.
+
 For every bookmark return one entry with:
 - n: the bookmark's number;
-- category: exactly one of: {categories}; if none fits use "Other" and put a short new category
-  name in suggested_category;
+- category: exactly one category name from the list above;
 - tags: up to 5 short lowercase topic tags;
 - kind: what the person can do with it: read (an article or long explanation to read later),
   try (a tool, repo, prompt or product to try), post-idea (inspiration for their own post),
@@ -50,11 +53,37 @@ For every bookmark return one entry with:
   (a repeatable procedure an AI agent could learn as a skill);
 - summary: one sentence, at most 160 characters, in {language};
 - priority: 1 (high value for this person, act or read soon), 2 (useful), 3 (low);
-- why_saved: a short guess why the person saved it, in {language}.
+- why_saved: a short phrase on what this bookmark gives the person (for example "a ready
+  prompt to reuse", "a list of grant programs"), in {language}. Base it on the bookmark's
+  content; do not restate who the person is or what they follow.
 Return {{"items": [...]}} with one entry per bookmark, in any order."""
 
 
 ABOUT_MAX = 600
+
+# Boundaries for the default categories (day-1 run: crypto posts drifted into "AI & agents").
+# A user's own category gets no hint unless its name matches one of these.
+CATEGORY_HINTS = {
+    "ai & agents": "AI models, agents, prompts, AI products and AI automation",
+    "coding & dev tools": "programming, repos, developer tools, APIs, infrastructure "
+                          "(not crypto-specific)",
+    "crypto & web3": "tokens, chains, DeFi, NFTs, airdrops, wallets, staking, trading, crypto "
+                     "projects and people; stays here even when AI or bots are mentioned",
+    "business & growth": "marketing, audience growth, startups, sales, making money outside "
+                         "crypto",
+    "design & art": "visual design, illustration, branding, video and image styles",
+    "learning & guides": "general how-tos, courses and study material that fit no other topic",
+    "news & opinion": "news, commentary, hot takes, events",
+    "life & misc": "personal posts, humor, games, everything else",
+}
+
+
+def category_lines(categories: Sequence[str]) -> str:
+    out = []
+    for c in categories:
+        hint = CATEGORY_HINTS.get(c.lower())
+        out.append(f'- "{c}"' + (f": {hint}" if hint else ""))
+    return "\n".join(out)
 
 
 def about_block(about_me: str = "", own_username: str = "") -> str:
@@ -62,8 +91,9 @@ def about_block(about_me: str = "", own_username: str = "") -> str:
     lines = []
     about = " ".join(str(about_me or "").split())[:ABOUT_MAX]
     if about:
-        lines.append(f"About the person (their own words; use them to judge priority and "
-                     f"why_saved): {about}")
+        lines.append(f"About the person (their own words): {about}\n"
+                     "Use this only to judge priority. Never let it choose the category or "
+                     "tags, and never repeat it in summary or why_saved.")
     if own_username:
         lines.append(f"Their X handle is @{own_username}; a block by that author is their own "
                      f"post.")
@@ -214,12 +244,12 @@ def _usage(result: Any) -> tuple[int, int, float]:
 
 def call_model(llm: Any, batch: list[Item], categories: Sequence[str], language: str,
                *, use_schema: bool = True, about: str = "") -> Any:
-    instructions = INSTRUCTIONS.format(categories=", ".join(f'"{c}"' for c in categories),
+    instructions = INSTRUCTIONS.format(categories=category_lines(categories),
                                        language=language, about=about)
     blocks = [{"type": "text", "text": item_block(n, it)} for n, it in enumerate(batch, 1)]
     kwargs: dict[str, Any] = {"instructions": instructions, "input": blocks,
                               "schema_name": "bookmark_labels", "task": AUX_TASK,
-                              "purpose": "x-bookmarks: sort bookmarks", "temperature": 0.2}
+                              "purpose": "x-bookmarks: sort bookmarks", "temperature": 0.0}
     if use_schema:
         kwargs["json_schema"] = schema(categories)
     else:
