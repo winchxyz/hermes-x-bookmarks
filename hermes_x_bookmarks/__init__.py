@@ -13,13 +13,18 @@ PLUGIN_NAME = "hermes-x-bookmarks"
 
 
 def register(ctx: Any) -> None:
-    """Register the ``hermes xbm`` CLI command.
+    """Register ``/xbm`` in chats and ``hermes xbm`` in the terminal.
 
-    Opens no sockets and imports nothing heavy: Plugin Doctor blocks the network while this runs.
+    Opens no sockets, no database and imports nothing heavy: Plugin Doctor blocks the network
+    while this runs.
     """
-    from . import cli
+    from . import cli, commands
 
+    ctx.register_command(
+        "xbm", commands.make_slash_handler(ctx),
+        description="X bookmarks: sync, status, list",
+        args_hint="sync [full] | status | list [N]")
     ctx.register_cli_command(
-        name="xbm", help="X bookmarks: check the X sign-in and probe the API",
+        name="xbm", help="X bookmarks: sign-in check, sync, status, list",
         setup_fn=cli.setup, handler_fn=cli.make_handler(ctx),
-        description="hermes xbm whoami | probe")
+        description="hermes xbm whoami | probe | sync | status | list")

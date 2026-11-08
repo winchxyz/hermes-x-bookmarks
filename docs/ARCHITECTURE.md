@@ -54,7 +54,10 @@ skills/x-bookmarks/SKILL.md   how the agent should use the tools
   no longer requested by default (cover only). Live results: `docs/research/x-api.md`.
 - `max_results=90` (one developer saw fewer results at 100). Only the most recent bookmarks are
   reachable: somewhere between ~200 and ~800. Each full run records how many came back.
-- Incremental sync: page from newest until we reach a post id we already have.
+- Incremental sync (`sync.py`): pages of 20 from newest, stop after 5 stored ids in a row (one
+  known id is not enough: a re-bookmarked old post jumps to the top above newer bookmarks). First
+  sync or `/xbm sync full`: pages of 90 to the end. Each page is stored as it arrives, so a 429
+  keeps what came before; the run row records pages, counts, stop reason and the cost meter.
 - Price (owned reads, the user owns the app): **$0.001 per post returned**; expansions on owned
   endpoints probably bill at $0.001 too; from 2026-11-22 media objects bill per item. Resources are
   deduplicated per UTC day. Monthly cap 3M post reads. Other lookups: `GET /2/tweets` $0.005/post.
@@ -95,6 +98,9 @@ No scraping, no internal x.com endpoints, no browser automation.
 quoted_id, thread_ids, links json, media json, body_status, deleted_at), `classes`, `exports`
 (target, item id, remote id, hash), `tasks`, `notes`, `digests`, `runs` (started, counts, cost).
 **No tokens in plugin data** (catalog rule 11).
+Phase 2 ships `items` (the `reader.Item` as JSON plus indexed columns), `runs` and `meta`
+(remembered X user id). X gives no bookmark time, so order is `seq = run_id * 10^7 - position`:
+newest bookmark first, later runs above earlier ones.
 
 Deletion compliance (X Developer Policy): when a post disappears or is deleted on X, mark it and
 remove or update the copies in Notion / Docs / local on the next sync. Un-bookmarked posts: setting
