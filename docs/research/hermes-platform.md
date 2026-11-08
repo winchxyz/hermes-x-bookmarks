@@ -51,7 +51,7 @@ methods are listed at `ctx:36-883`; scheduling-related ones are:
 | Surface | What it does | Ref |
 |---|---|---|
 | `ctx.register_automation_blueprint(key, title, description, schedule_template, prompt_template, category, slots, deliver_default, skills, tags)` | Adds a fill-in-the-blanks automation to `/blueprint`, the dashboard Blueprints tab and the Desktop Cron page. Scheduling it creates an **ordinary cron job**. Key is namespaced `<plugin>:<key>`. Slots: `time`, `enum`, `weekdays`, `text`; a slot named `deliver` gets the profile's real delivery targets. Validated at registration. Jobs outlive the plugin. No capability needed, works under `plugins.isolation: host`. | `index.md:2067-2098`, `hermes_cli/plugins_content.py:69`, `cron/blueprint_plugins.py` |
-| `ctx.dispatch_tool("cronjob_manage", {...})` | Public way to call any registered tool from a slash command or hook; goes through the normal approval/redaction pipeline. The cron tool is registered as `cronjob_manage` (`tools/cronjob_tools.py:1264`); docs call it `cronjob(action=...)`. | `index.md:940,1898-1935`, `ctx:483` |
+| `ctx.dispatch_tool("cronjob_manage", {...})` | Public way to call any registered tool from a slash command or hook. **Correction (2026-11-08):** it calls `registry.dispatch` directly (`tools/registry.py:972`, main 856e7580 and v0.23.0), skipping the availability check, all `pre_tool_call` hooks and middleware; only guards inside the tool run. Confirm side effects in our own code. The cron tool is registered as `cronjob_manage` (`tools/cronjob_tools.py:1264`); docs call it `cronjob(action=...)`. | `index.md:940,1898-1935`, `ctx:483` |
 | `ctx.current_cron_execution()` | Inside a cron run: frozen `CronExecution(job_id, job_name, execution_id, source, scheduled_instant, started_at, profile)`, else `None`. Unforgeable by the model. Use it to tell a scheduled run from a chat turn. | `index.md:2043-2065`, `ctx:218` |
 | `ctx.spawn_task(coro)` | Supervised asyncio task, cancelled on unload; **needs a running loop** (not usable from sync `register()`). | `ctx:232` |
 
@@ -157,7 +157,8 @@ Three routes:
    `skills.create_dir` (`skill_manager_tool.py:1-8,212-220`). Limits: name 64 chars, description 1024,
    SKILL.md 100,000 chars, supporting files 1 MiB (`skill_manager_tool.py:108-111`). Agent-created
    skill scanning is opt-in (`skills.guard_agent_created`, `skill_manager_tool.py:41-46`). Because it
-   is a real tool dispatch, approvals apply. Alternatively our tool returns a drafted SKILL.md and the
+   is a direct registry dispatch, hooks and middleware do **not** run (see the correction in
+   section 1); confirm with the user in our own code first. Alternatively our tool returns a drafted SKILL.md and the
    agent itself calls `skill_manage`.
 3. **Writing files into `HERMES_HOME/skills` directly**: works (legacy `shutil.copy2` pattern,
    `index.md:1220-1222`) but is a write outside the plugin's data dir (rule 13 disclosure) and skips

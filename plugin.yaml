@@ -1,0 +1,37 @@
+manifest_version: 2
+name: hermes-x-bookmarks
+version: "0.0.1"
+description: "Hermes reads your X bookmarks (threads and Articles too), sorts them with your own model and keeps them in Notion, Google Docs or a desktop document."
+author: winchxyz
+kind: standalone
+license: MIT
+homepage: https://github.com/winchxyz/hermes-x-bookmarks
+requires_hermes: ">=0.23.0"
+tags: [x, twitter, bookmarks, notion, productivity]
+provides_tools: []
+provides_hooks: []
+optional_env:
+  - name: XBM_X_CLIENT_ID
+    description: "OAuth 2.0 Client ID of your own X developer app (Native App, read-only). Sign in with `hermes auth add hermes-x-bookmarks:x`."
+    url: "https://console.x.com"
+# Hermes runs the X sign-in, stores the grant in this profile's auth.json and refreshes it.
+# The plugin never holds a token: every X call goes through credentialed_provider_request("x", ...).
+oauth:
+  - id: x
+    authorize_url: https://x.com/i/oauth2/authorize
+    token_url: https://api.x.com/2/oauth2/token
+    scopes: [tweet.read, users.read, bookmark.read, offline.access]
+    client_id_env: XBM_X_CLIENT_ID
+    hosts: [api.x.com]
+config_schema:
+  auth_backend:
+    type: str
+    default: "hermes"
+    choices: ["hermes", "xurl"]
+    label: "X sign-in"
+    description: "hermes: Hermes' own sign-in (hermes auth add hermes-x-bookmarks:x). xurl: the official X CLI you already signed in with (xurl token)."
+  xurl_app:
+    type: str
+    default: ""
+    label: "xurl app name"
+    description: "Only for the xurl sign-in: the app name you gave `xurl auth apps add`. Empty uses xurl's default app."

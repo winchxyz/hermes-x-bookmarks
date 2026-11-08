@@ -135,7 +135,15 @@ Priority (select). Page body: summary, the text or Article body, quote, links, i
   `attach_to_session: true` so the user can reply ("make #3 a task"). Sync job answers `[SILENT]`
   unless something failed. Jobs outlive the plugin: README and `/xbm unschedule` say so.
 - **Skill creation**: draft SKILL.md with `ctx.llm`, show it, then `skill_manage` via
-  `dispatch_tool` (user-owned, approvals apply).
+  `dispatch_tool` (the skill is user-owned and editable).
+- **`ctx.dispatch_tool` skips hooks** (correction, 2026-11-08): it calls `registry.dispatch`
+  directly (`tools/registry.py:972` on hermes-agent main 856e7580 and v0.23.0), so the tool's
+  availability check, every `pre_tool_call` hook and all middleware are bypassed; only guards inside
+  the called tool still run. Our `pre_tool_call` gate covers the model calling `xbm_*` tools, not what
+  our code dispatches. Every side effect we reach through `dispatch_tool` (`skill_manage`,
+  `cronjob_manage`, file writes, exports) asks for confirmation inside our own code first
+  (`ctx.ask_choice` from a slash command; under cron only what the user enabled in settings).
+  Reported by a sibling research session; re-check in the code at phase 6.
 
 ## X sign-in (the day-1 blocker)
 
