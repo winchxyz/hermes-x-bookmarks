@@ -52,8 +52,10 @@ skills/x-bookmarks/SKILL.md   how the agent should use the tools
   Day 1 (live): both `tweet.fields` and `post.fields` work; we keep the old names. Day 1 also
   showed Article inline images are half of all expanded resources, so `article.media_entities` is
   no longer requested by default (cover only). Live results: `docs/research/x-api.md`.
-- `max_results=90` (one developer saw fewer results at 100). Only the most recent bookmarks are
-  reachable: somewhere between ~200 and ~800. Each full run records how many came back.
+- `max_results=90` (one developer saw fewer results at 100). Reports said only the most recent
+  ~200-800 bookmarks are reachable; the owner's first live sync (2026-11-08) got all 1,880 in 21
+  pages to the end (no `next_token`), ~12 s, ~$1.89 before expansions are billed. Each full run
+  records how many came back.
 - Incremental sync (`sync.py`): pages of 20 from newest, stop after 5 stored ids in a row (one
   known id is not enough: a re-bookmarked old post jumps to the top above newer bookmarks). First
   sync or `/xbm sync full`: pages of 90 to the end. Each page is stored as it arrives, so a 429

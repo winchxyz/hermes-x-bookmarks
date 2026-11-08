@@ -38,6 +38,9 @@ MCP as an option if its tool set covers database create + view + upsert.
   (161/161) and for quoted Articles in `includes.tweets` (32/32). The number in
   `x.com/i/article/<n>` is not a post id; never look it up. Code blocks come in
   `article.entities.code`. Details: `docs/research/x-api.md`, "Day-1 live results".
+- **Phase 2 gate passed (2026-11-08, live):** first `hermes xbm sync` stored 1,880 bookmarks
+  (213 Articles, all with full text) to the end of the list; the second sync made 1 request
+  (20 posts, ~$0.02), found 0 new and stopped as caught up.
 - **Expansions (2026-11-08):** no `article.media_entities` by default (half of all billable
   expanded resources after 2026-11-22); incremental syncs use small pages and stop at known ids.
 
