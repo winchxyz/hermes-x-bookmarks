@@ -30,6 +30,8 @@ class FakeCtx:
         self.cli: dict[str, dict] = {}
         self.skills: list[dict] = []
         self.config = dict(config or {})
+        self.aux_tasks: dict[str, dict] = {}
+        self.llm = None
 
     def register_tool(self, name, toolset, schema, handler, check_fn=None, requires_env=None,
                       is_async=False, description="", emoji="", override=False):
@@ -49,6 +51,34 @@ class FakeCtx:
 
     def get_config(self, key, default=None):
         return self.config.get(key, default)
+
+    def register_auxiliary_task(self, key, *, display_name, description, defaults=None,
+                                inherit_from=None):
+        self.aux_tasks[key] = {"display_name": display_name, "inherit_from": inherit_from}
+
+
+class FakeUsage:
+    def __init__(self, i=100, o=50, cost=0.001):
+        self.input_tokens, self.output_tokens, self.cost_usd = i, o, cost
+
+
+class FakeResult:
+    def __init__(self, parsed, model="fake-model"):
+        self.parsed, self.model, self.usage = parsed, model, FakeUsage()
+        self.text = json.dumps(parsed) if parsed is not None else "not json"
+
+
+class FakeLlm:
+    """``ctx.llm`` stand-in: ``answer(kwargs, texts) -> parsed`` (or raises)."""
+
+    def __init__(self, answer):
+        self.answer = answer
+        self.calls: list[dict] = []
+
+    def complete_structured(self, **kwargs):
+        self.calls.append(kwargs)
+        texts = [b["text"] for b in kwargs["input"]]
+        return FakeResult(self.answer(kwargs, texts))
 
 
 class FakeTransport:

@@ -56,7 +56,7 @@ skills/x-bookmarks/SKILL.md   how the agent should use the tools
   ~200-800 bookmarks are reachable; the owner's first live sync (2026-11-08) got all 1,880 in 21
   pages to the end (no `next_token`), ~12 s, ~$1.89 before expansions are billed. Each full run
   records how many came back.
-- Incremental sync (`sync.py`): pages of 20 from newest, stop after 5 stored ids in a row (one
+- Incremental sync (`sync.py`): pages of 10 from newest, stop after 5 stored ids in a row (one
   known id is not enough: a re-bookmarked old post jumps to the top above newer bookmarks). First
   sync or `/xbm sync full`: pages of 90 to the end. Each page is stored as it arrives, so a 429
   keeps what came before; the run row records pages, counts, stop reason and the cost meter.
@@ -92,6 +92,14 @@ No scraping, no internal x.com endpoints, no browser automation.
   `priority` (1-3), `why_saved` guess.
 - Cached by (post id, text hash, schema version). Token totals shown in `/xbm status`.
 - Post text is untrusted data: prompts frame it as data; outputs are validated against the schema.
+- Built (phase 3): aux task `xbm_classify` with no `inherit_from` (provider "auto" = the main
+  model until the user pins one in `hermes model`). Items are numbered 1..10 inside a call, so X
+  ids never pass through the model. Body text clipped to 1,500 chars, quoted post to 600.
+  If the provider rejects JSON-schema output, the run switches to `json_mode` and validates
+  itself. Unknown categories become "Other" (+ `suggested_category`), unknown kinds "reference",
+  priority is clamped; items with no usable answer stay unsorted for the next run.
+  `/xbm classify` in a chat sorts 20 (max 100); `hermes xbm classify --all` sorts the rest.
+  Settings: `categories` (comma-separated), `classify_language`.
 
 ## Storage (store.py)
 

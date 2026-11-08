@@ -70,7 +70,7 @@ def test_first_sync_is_full_then_incremental_stops_at_known(store):
     r = sync(api, store)
     assert (r.kind, r.stop_reason, r.new, r.pages) == ("incremental", "known", 3, 1)
     bookmark_calls = [q for p, q in t.calls if p.endswith("/bookmarks")]
-    assert len(bookmark_calls) == 1 and bookmark_calls[0]["max_results"] == "20"
+    assert len(bookmark_calls) == 1 and bookmark_calls[0]["max_results"] == "10"
     assert not any(p == "/2/users/me" for p, _ in t.calls)  # user id is remembered
     assert [i.id for i in store.list_items(limit=5)] == ["1003", "1002", "1001", "1000", "999"]
     assert store.count() == 203
@@ -179,7 +179,7 @@ def test_slash_command_sync_status_list():
     out = handler("sync")
     assert "12 new" in out and "reached the end" in out
     status = handler("status", session_id="s1")
-    assert "Stored bookmarks: 12 (X account @me)" in status and "full: ok" in status
+    assert "Stored bookmarks: 12 (X account @me)" in status and "full sync: ok" in status
     listing = handler("list 2")
     assert listing.startswith("#1 @alice") and "#2 @alice" in listing and "#3" not in listing
     assert "https://x.com/alice/status/1000" in listing

@@ -10,12 +10,12 @@ from __future__ import annotations
 import datetime as _dt
 import json
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from .reader import Item
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # 2: classes
 RUN_SPAN = 10_000_000  # more new bookmarks than one run can ever bring
 
 SCHEMA = """
@@ -45,6 +45,21 @@ CREATE TABLE IF NOT EXISTS runs (
     cost TEXT NOT NULL DEFAULT '{}',
     error TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS classes (
+    item_id TEXT PRIMARY KEY REFERENCES items(id) ON DELETE CASCADE,
+    text_hash TEXT NOT NULL,
+    schema_version INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    suggested_category TEXT NOT NULL DEFAULT '',
+    tags TEXT NOT NULL DEFAULT '[]',
+    kind TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    priority INTEGER NOT NULL,
+    why_saved TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS classes_category ON classes(category);
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -135,12 +150,82 @@ class Store:
         row = self.conn.execute("SELECT data FROM items WHERE id = ?", (item_id,)).fetchone()
         return Item.from_dict(json.loads(row["data"])) if row else None
 
-    def list_items(self, *, limit: int = 20, offset: int = 0,
-                   include_removed: bool = False) -> list[Item]:
-        where = "" if include_removed else "WHERE removed_at IS NULL "
-        rows = self.conn.execute(
-            f"SELECT data FROM items {where}ORDER BY seq DESC LIMIT ? OFFSET ?", (limit, offset))
+    def list_items(self, *, limit: int = 20, offset: int = 0, include_removed: bool = False,
+                   category: str | None = None) -> list[Item]:
+        where, args = [], []
+        if not include_removed:
+            where.append("i.removed_at IS NULL")
+        if category:
+            where.append("lower(c.category) = lower(?)")
+            args.append(category)
+        sql = ("SELECT i.data FROM items i LEFT JOIN classes c ON c.item_id = i.id "
+               + (("WHERE " + " AND ".join(where) + " ") if where else "")
+               + "ORDER BY i.seq DESC LIMIT ? OFFSET ?")
+        rows = self.conn.execute(sql, (*args, limit, offset))
         return [Item.from_dict(json.loads(r["data"])) for r in rows]
+
+    # labels -------------------------------------------------------------------------------
+    def unclassified(self, schema_version: int, hasher: Callable[[Item], str], *,
+                     limit: int | None = None) -> list[Item]:
+        """Items with no label, an older schema or changed text, most recent bookmark first."""
+        rows = self.conn.execute(
+            "SELECT i.data, c.text_hash, c.schema_version FROM items i "
+            "LEFT JOIN classes c ON c.item_id = i.id WHERE i.removed_at IS NULL "
+            "ORDER BY i.seq DESC")
+        out: list[Item] = []
+        for r in rows:
+            item = Item.from_dict(json.loads(r["data"]))
+            if r["text_hash"] is not None and r["schema_version"] == schema_version \
+                    and r["text_hash"] == hasher(item):
+                continue
+            out.append(item)
+            if limit is not None and len(out) >= limit:
+                break
+        return out
+
+    def count_unclassified(self, schema_version: int) -> int:
+        return int(self.conn.execute(
+            "SELECT COUNT(*) FROM items i LEFT JOIN classes c ON c.item_id = i.id "
+            "WHERE i.removed_at IS NULL AND (c.item_id IS NULL OR c.schema_version != ?)",
+            (schema_version,)).fetchone()[0])
+
+    def save_label(self, item_id: str, text_hash: str, schema_version: int, label: Any,
+                   model: str = "") -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO classes(item_id, text_hash, schema_version, category, "
+                "suggested_category, tags, kind, summary, priority, why_saved, model, created_at) "
+                "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(item_id) DO UPDATE SET "
+                "text_hash = excluded.text_hash, schema_version = excluded.schema_version, "
+                "category = excluded.category, suggested_category = excluded.suggested_category, "
+                "tags = excluded.tags, kind = excluded.kind, summary = excluded.summary, "
+                "priority = excluded.priority, why_saved = excluded.why_saved, "
+                "model = excluded.model, created_at = excluded.created_at",
+                (item_id, text_hash, schema_version, label.category, label.suggested_category,
+                 json.dumps(label.tags, ensure_ascii=False), label.kind, label.summary,
+                 label.priority, label.why_saved, model, now_iso()))
+
+    def label(self, item_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM classes WHERE item_id = ?", (item_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["tags"] = json.loads(d["tags"] or "[]")
+        return d
+
+    def category_counts(self) -> list[tuple[str, int]]:
+        rows = self.conn.execute(
+            "SELECT c.category, COUNT(*) AS n FROM classes c JOIN items i ON i.id = c.item_id "
+            "WHERE i.removed_at IS NULL GROUP BY c.category ORDER BY n DESC, c.category")
+        return [(r["category"], int(r["n"])) for r in rows]
+
+    def llm_totals(self) -> dict[str, Any]:
+        tot = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "llm_cost_usd": 0.0}
+        for r in self.conn.execute("SELECT cost FROM runs WHERE kind = 'classify'"):
+            c = json.loads(r["cost"] or "{}")
+            for k in tot:
+                tot[k] += c.get(k) or 0
+        return tot
 
     def stats(self) -> dict[str, int]:
         row = self.conn.execute(

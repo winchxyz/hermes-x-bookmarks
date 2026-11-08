@@ -17,7 +17,7 @@ from . import reader
 from .store import Store
 from .xapi import DEFAULT_PAGE_SIZE, RateLimited, XApi, XApiError
 
-INCREMENTAL_PAGE_SIZE = 20
+INCREMENTAL_PAGE_SIZE = 10
 STOP_AFTER_KNOWN = 5
 
 

@@ -18,13 +18,18 @@ def register(ctx: Any) -> None:
     Opens no sockets, no database and imports nothing heavy: Plugin Doctor blocks the network
     while this runs.
     """
-    from . import cli, commands
+    from . import classify, cli, commands
 
+    register_aux = getattr(ctx, "register_auxiliary_task", None)
+    if register_aux is not None:
+        # Own model slot; provider "auto" means the user's main model until they pin another one.
+        register_aux(classify.AUX_TASK, display_name="X bookmarks: sorting",
+                     description="Sorts saved X bookmarks into categories (batches of 10)")
     ctx.register_command(
         "xbm", commands.make_slash_handler(ctx),
-        description="X bookmarks: sync, status, list",
-        args_hint="sync [full] | status | list [N]")
+        description="X bookmarks: sync, classify, status, list",
+        args_hint="sync [full] | classify [N] | status | list [N] [category]")
     ctx.register_cli_command(
-        name="xbm", help="X bookmarks: sign-in check, sync, status, list",
+        name="xbm", help="X bookmarks: sign-in check, sync, classify, status, list",
         setup_fn=cli.setup, handler_fn=cli.make_handler(ctx),
-        description="hermes xbm whoami | probe | sync | status | list")
+        description="hermes xbm whoami | probe | sync | classify | status | list")

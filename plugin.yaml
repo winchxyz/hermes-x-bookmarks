@@ -50,3 +50,13 @@ config_schema:
     default: ""
     label: "xurl app name"
     description: "Only for the xurl sign-in: the app name you gave `xurl auth apps add`. Empty uses xurl's default app."
+  categories:
+    type: str
+    default: "AI & agents, Coding & dev tools, Crypto & web3, Business & growth, Design & art, Learning & guides, News & opinion, Life & misc"
+    label: "Bookmark categories"
+    description: "Comma-separated categories the model sorts bookmarks into. \"Other\" is always added, with a suggested new name."
+  classify_language:
+    type: str
+    default: "English"
+    label: "Summary language"
+    description: "Language of the one-line summary and the why-saved note, e.g. English or Russian."

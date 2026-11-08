@@ -16,9 +16,11 @@ COMMANDS = (
     ("whoami", "Check the X sign-in: print your X user id and handle"),
     ("probe", "Day-1 spike: ask X how bookmarks and Articles come back"),
     ("sync", "Pull new bookmarks from X into the local store"),
-    ("status", "How many bookmarks are stored, last syncs and their cost"),
+    ("classify", "Sort unsorted bookmarks with your Hermes model"),
+    ("status", "How many bookmarks are stored, categories, last runs and their cost"),
     ("list", "Show the most recent stored bookmarks"),
 )
+COMMANDS_RUN = ("sync", "classify", "status", "list")
 NEEDS_X = ("whoami", "probe", "sync")
 
 
@@ -40,6 +42,11 @@ def setup(parser: argparse.ArgumentParser) -> None:
                            help="Stop after this many pages (default: no limit)")
         if name == "list":
             p.add_argument("--limit", type=int, default=10, help="How many (max 100)")
+            p.add_argument("--category", default="", help="Only this category (or its start)")
+        if name == "classify":
+            p.add_argument("--limit", type=int, default=20,
+                           help="Sort at most this many, most recent first (default 20)")
+            p.add_argument("--all", action="store_true", help="Sort every unsorted bookmark")
 
 
 def say(line: str) -> None:
@@ -67,18 +74,22 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
         if cmd not in {c for c, _ in COMMANDS}:
             print("usage: hermes xbm {" + "|".join(c for c, _ in COMMANDS) + "}")
             return 2
-        if cmd in ("sync", "status", "list"):
+        if cmd in COMMANDS_RUN:
             words = [cmd]
             if cmd == "sync" and args.full:
                 words.append("full")
             if cmd == "list":
                 words.append(str(args.limit))
+                words.extend(str(getattr(args, "category", "") or "").split())
+            if cmd == "classify":
+                words.append("all" if args.all else str(max(1, args.limit)))
             lines = commands.run(words, ctx=ctx, api_factory=build, db_factory=db_factory,
                                  overrides=_overrides(args), log=say,
-                                 max_pages=getattr(args, "max_pages", None))
+                                 max_pages=getattr(args, "max_pages", None), classify_cap=None)
             for line in lines:
                 say(line)
-            failed = lines and lines[0].startswith(("Sync failed", "X sign-in unavailable"))
+            failed = lines and lines[0].startswith(
+                ("Sync failed", "X sign-in unavailable", "No model access"))
             return 1 if failed else 0
         api = build(commands.config_of(ctx, _overrides(args)))
         try:
