@@ -1,0 +1,16 @@
+.env
+*.env
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.db
+*.db-wal
+*.db-shm
+# local exports and OAuth tokens from manual runs
+out/
+tokens*.json
