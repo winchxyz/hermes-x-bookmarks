@@ -16,15 +16,7 @@ Developer Policy warns against tools that make every end user register their own
 brings their own X app and keys and pays X for their own reads. The policy question of D1b stays
 open for a catalog submission.
 
-**D2. X sign-in route.** Hermes plugin OAuth if X accepts a random loopback port, else upstream
-`redirect_port` (hermes-agent#149642), else the `xurl` CLI. Settled by the day-1 spike.
-2026-11-08: added a fourth route, now the default when its values are set: OAuth 1.0a user
-context with the four keys from the user's own app (Keys and tokens page) in the Hermes profile's
-`.env`, read through `agent.secret_scope`. X lists OAuth 1.0a user context for the bookmarks
-endpoint (spec `UserToken`). No browser sign-in, no callback URL, tokens do not expire; the user
-regenerates them on X to revoke. Confirmed in Hermes v0.23.0 code: plugin `oauth:` login binds a
-random port (no `redirect_port` on the manifest entry), so the OAuth 2.0 route still waits for
-#149642.
+**D2. X sign-in route: settled 2026-11-08** (see "Made" below).
 
 **D3. Notion route.** Internal integration token (simple, our code) vs the optional Notion MCP
 (`ctx.call_mcp`, no token in our plugin, but the user edits `mcp_allowlist`). Default: token;
@@ -33,6 +25,21 @@ MCP as an option if its tool set covers database create + view + upsert.
 **D4. Product name.** Working name hermes-x-bookmarks / `/xbm`.
 
 ## Made
+
+- **D2, X sign-in (2026-11-08, day-1 spike, gate passed).** Default route: OAuth 1.0a user
+  context with the four keys of the user's own X app (API Key/Secret, Access Token/Secret from
+  Keys and tokens) in the Hermes profile's `.env`, read through `agent.secret_scope`, each GET
+  signed with HMAC-SHA1 (`oauth1.py`). Works live on `users/me` and the bookmarks endpoint. No
+  browser sign-in, no callback URL, tokens do not expire; the user revokes by regenerating them
+  on X. Kept as options: Hermes plugin OAuth 2.0 (`hermes auth add hermes-x-bookmarks:x`), which
+  still binds a random loopback port in Hermes v0.23.0 (no `redirect_port`, hermes-agent#149642),
+  and the `xurl` CLI. Not tested live: whether X accepts the random port.
+- **Article bodies (2026-11-08, live):** `article.plain_text` arrives inline for Article bookmarks
+  (161/161) and for quoted Articles in `includes.tweets` (32/32). The number in
+  `x.com/i/article/<n>` is not a post id; never look it up. Code blocks come in
+  `article.entities.code`. Details: `docs/research/x-api.md`, "Day-1 live results".
+- **Expansions (2026-11-08):** no `article.media_entities` by default (half of all billable
+  expanded resources after 2026-11-22); incremental syncs use small pages and stop at known ids.
 
 - Official X API only. No scraping, internal x.com endpoints or browser automation.
 - LLM through the user's Hermes model (`ctx.llm`); no plugin-owned AI key.

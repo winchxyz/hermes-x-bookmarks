@@ -49,7 +49,9 @@ skills/x-bookmarks/SKILL.md   how the agent should use the tools
   referenced_tweets,attachments,public_metrics,note_tweet,article`, `expansions=author_id,
   referenced_tweets.id,attachments.media_keys,article.cover_media,article.media_entities`,
   `user.fields=username,name`, `media.fields=url,preview_image_url,alt_text,type`.
-  Day 1: check whether the API wants `tweet.fields` or the new `post.fields` names.
+  Day 1 (live): both `tweet.fields` and `post.fields` work; we keep the old names. Day 1 also
+  showed Article inline images are half of all expanded resources, so `article.media_entities` is
+  no longer requested by default (cover only). Live results: `docs/research/x-api.md`.
 - `max_results=90` (one developer saw fewer results at 100). Only the most recent bookmarks are
   reachable: somewhere between ~200 and ~800. Each full run records how many came back.
 - Incremental sync: page from newest until we reach a post id we already have.
@@ -67,7 +69,7 @@ Body text priority: `article.plain_text` > `note_tweet.text` > `text`.
 |---|---|---|
 | (a) the bookmark is an Article | `article.title` present | `article.plain_text` from the same response; if missing, `GET /2/tweets?ids=…&tweet.fields=article` |
 | (b1) quotes an Article post | `referenced_tweets[type=quoted]` and the quoted post has `article.title` | from `includes.tweets`, else re-fetch the quoted id |
-| (b2) Article attached as the card (instead of an image) | `entities.urls[].expanded_url` / `unwound_url` matches `x.com/i/article/<n>` or `x.com/<user>/article/<n>` | try `GET /2/tweets?ids=<n>&tweet.fields=article`, accept only if `article.title` comes back; else keep the link preview (title, description, image) and mark `body_unavailable` |
+| (b2) Article attached as the card (instead of an image) | a post that is **not** itself an Article and does not quote one, whose `entities.urls[].expanded_url` / `unwound_url` matches `x.com/i/article/<n>` or `x.com/<user>/article/<n>` | `<n>` is an article id, not a post id (day 1: 100/100 lookups "not found"), so no lookup: keep the link preview (title, description, image) and mark `body_unavailable`. Not seen once in 899 live bookmarks. |
 | long post | `note_tweet` present | `note_tweet.text` |
 | thread | `conversation_id != id` or author replies to self | `search/recent` `conversation_id:<id> from:<author>` (last 7 days only); older threads: quoted / replied-to chain only, marked partial |
 

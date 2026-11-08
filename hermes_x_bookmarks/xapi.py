@@ -18,8 +18,9 @@ API = "https://api.x.com"
 # Old ("tweet") parameter names: what the data dictionary, X staff and xurl use today.
 TWEET_FIELDS = ("id,text,created_at,author_id,conversation_id,in_reply_to_user_id,"
                 "referenced_tweets,entities,attachments,lang,public_metrics,note_tweet,article")
-EXPANSIONS = ("author_id,attachments.media_keys,referenced_tweets.id,"
-              "article.cover_media,article.media_entities")
+# No article.media_entities: Article inline images were half of all expanded resources on day 1
+# (billable from 2026-11-22) and cannot be placed in the text anyway. The cover stays.
+EXPANSIONS = "author_id,attachments.media_keys,referenced_tweets.id,article.cover_media"
 USER_FIELDS = "id,name,username"
 MEDIA_FIELDS = "media_key,type,url,preview_image_url,alt_text,width,height"
 

@@ -1,0 +1,13 @@
+{
+  "errors": [
+    {
+      "detail": "Could not find post with ids: [1900000000006000018].",
+      "parameter": "ids",
+      "resource_id": "1900000000006000018",
+      "resource_type": "tweet",
+      "title": "Veniam Quis Nostrud",
+      "type": "https://api.x.com/2/problems/resource-not-found",
+      "value": "1900000000006000018"
+    }
+  ]
+}

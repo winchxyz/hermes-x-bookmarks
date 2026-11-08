@@ -110,7 +110,7 @@ def classify(post: Mapping[str, Any], inc: Mapping[str, Mapping[str, Any]]) -> l
         tags.append("quotes-article(b1)")
     elif articles.quoted_ids(post):
         tags.append("quote")
-    if articles.article_link_ids(post):
+    if articles.card_article_ids(post, inc):
         tags.append("article-link(b2)")
     if post.get("note_tweet"):
         tags.append("long")
@@ -179,12 +179,12 @@ def run_probe(api: XApi, out: Path, *, max_pages: int = 10,
                          if articles.article_of(inc.get(q))}
                for p in posts if any(articles.article_of(inc.get(q))
                                      for q in articles.quoted_ids(p))}
-    case_b2 = {p["id"]: {"link_ids": articles.article_link_ids(p),
+    case_b2 = {p["id"]: {"link_ids": articles.card_article_ids(p, inc),
                          "url_entities": [{k: u.get(k) for k in
                                            ("expanded_url", "unwound_url", "title", "description",
                                             "status") if k in u}
                                           for u in articles.url_entities(p)]}
-               for p in posts if articles.article_link_ids(p)}
+               for p in posts if articles.card_article_ids(p, inc)}
     report["bookmarks_call"] = {
         "case_a_article": case_a, "case_b1_quoted_article": case_b1,
         "case_b2_article_link": case_b2,
@@ -193,7 +193,8 @@ def run_probe(api: XApi, out: Path, *, max_pages: int = 10,
                          and p.get("conversation_id") != p.get("id")),
     }
 
-    # 4. GET /2/tweets for what the bookmarks call did not fill, and for every b2 link number
+    # 4. GET /2/tweets for Article bodies the bookmarks call did not fill. Not for b2 link numbers:
+    # day 1 showed they are article ids, not post ids (100 of 100 "not found").
     want: dict[str, str] = {}
     for pid, facts in case_a.items():
         if not facts.get("plain_text_len"):
@@ -202,9 +203,6 @@ def run_probe(api: XApi, out: Path, *, max_pages: int = 10,
         for qid, facts in quoted.items():
             if not facts.get("plain_text_len"):
                 want[qid] = f"b1: quoted article of {pid}"
-    for pid, b2 in case_b2.items():
-        for n in b2["link_ids"]:
-            want.setdefault(n, f"b2: article link in {pid}")
     lookups: dict[str, Any] = {}
     ids = list(want)[:MAX_LOOKUPS]
     if ids:

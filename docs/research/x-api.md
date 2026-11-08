@@ -403,6 +403,54 @@ Scopes are requested at authorize time, not set in the console: `tweet.read user
 
 ---
 
+## Day-1 live results (2026-11-08)
+
+`hermes xbm probe` against the owner's account (OAuth 1.0a user context, owner's own app,
+pay-per-use). Raw responses stay in the owner's plugin data; anonymised samples are in
+`tests/fixtures/`. **[LIVE]** below means seen in these responses.
+
+- **Sign-in:** OAuth 1.0a user context (API Key/Secret + Access Token/Secret of the owner's app)
+  works on `GET /2/users/me` and `GET /2/users/:id/bookmarks`. [LIVE]
+- **Parameter names:** both work. `tweet.fields` returns `note_tweet`, `referenced_tweets`,
+  `edit_history_tweet_ids`; `post.fields` (spec 2.174) returns `note_post`, `referenced_posts`,
+  `edit_history_post_ids`. The extra `card_uri` field and `referenced_tweets.id.author_id`
+  expansion are accepted too. We keep the old names. [LIVE]
+- **(a) Article bookmarks:** 161 of 899 bookmarks were Articles; **all 161 carried
+  `article.plain_text` inline** in the bookmarks call. Asking for `note_tweet` and `article`
+  together does not drop it (the `article_only` variant gave the same). Article posts never carry
+  `note_tweet`. Top-level `text` is only a t.co link. [LIVE]
+- **Article object:** `title`, `preview_text`, `plain_text` (11-538 newlines, 0.8k-46k chars),
+  `cover_media` (a bare media key string), `media_entities` (list of media keys, inline images),
+  `entities` with `urls` (`{text}`) and **`code`** (`[{code, content, language}]`: code blocks
+  come as entities, so they can be shown separately even though `plain_text` loses their place).
+  3 of 161 bodies contained zero-width characters. [LIVE]
+- **(b1) quoted Articles:** 32 bookmarks quoted an Article post; **all 32 quoted posts in
+  `includes.tweets` carried `article.plain_text`**. No extra lookup needed. [LIVE]
+- **(b2) Article links:** every Article post links to itself with
+  `entities.urls[].expanded_url = https://x.com/i/article/<n>`. **`<n>` is an article id, not a post
+  id**: `GET /2/tweets?ids=<n>` returned "Could not find post" for all 100 tried. Among 899
+  bookmarks no ordinary post carried an Article link without quoting it, so in practice shared
+  Articles arrive as (b1). For a pure (b2) link we keep the link preview and mark
+  `body_unavailable`; never look the number up as a post id. [LIVE]
+- **Long posts:** 278 of 899 had `note_tweet` (`text`, sometimes `entities`). 9 posts used
+  Mathematical Alphanumeric styled letters. [LIVE]
+- **Threads:** 47 bookmarks sat inside a conversation (`conversation_id != id`), 30 of them
+  self-replies. [LIVE]
+- **How many:** 10 pages x 90 = 899 bookmarks and X still returned `next_token`: more than 800 are
+  reachable on this account (the 199 stop of forum/274280 did not happen with `max_results=90`).
+  The full count is still unknown. [LIVE]
+- **Order:** post `created_at` is out of order in 346 of 898 neighbouring pairs, so the list is not
+  sorted by post time; it is consistent with newest-bookmarked-first. [LIVE, inference]
+- **Errors in a page:** expansions of deleted or protected referenced posts come back in
+  `errors` (`Not Found Error`, `Authorization Error`) next to a normal `data`. [LIVE]
+- **Volume per full run of 899:** 216 expanded posts, 838 users, 1733 media (649 attachments,
+  161 Article covers, 818 Article inline images). Before 2026-11-22 only the 899 posts bill:
+  ~$0.90 estimated. **After 2026-11-22 the same run would bill ~3.7k resources (~$3.70)**, half
+  of it Article inline images. Design change: drop `article.media_entities` from the default
+  expansions (inline images cannot be placed anyway), and make incremental syncs small pages that
+  stop at known ids. [LIVE + DOC pricing]
+- **Rate limit headers:** `x-rate-limit-limit 180`, 14 requests used. [LIVE]
+
 ## Open questions (test on day 1)
 
 1. Do `tweet.fields` / `note_tweet` / `referenced_tweets.id` (old names) and `post.fields` / `note_post` / `referenced_posts` (spec 2.174) both work on `GET /2/users/:id/bookmarks` today? Which one does the response use?

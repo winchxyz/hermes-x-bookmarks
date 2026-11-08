@@ -50,13 +50,13 @@ def test_run_probe_answers_all_three_cases(tmp_path):
     assert call["case_b1_quoted_article"]["101"]["200"]["plain_text_len"] == 0
     assert call["case_b2_article_link"]["102"]["link_ids"] == ["1987654321098765432"]
     assert report["lookups"]["200"]["found"] and report["lookups"]["200"]["plain_text_len"] == 4
-    assert report["lookups"]["1987654321098765432"]["found"] is False
+    assert "1987654321098765432" not in report["lookups"]  # article ids are not post ids
     saved = {p.name for p in tmp_path.iterdir()}
     assert {"me.json", "bookmarks-p01.json", "lookup-01.json", "report.json"} <= saved
     assert json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))["cost"]["requests"]
     text = "\n".join(probe.summary_lines(report))
     assert "(a) article bookmarks: 1, with plain_text inline: 1" in text
-    assert "ids=1987654321098765432" in text and "not found" in text
+    assert "(b2) posts with an article link: 1" in text
 
 
 def test_cli_whoami_and_usage(capsys):

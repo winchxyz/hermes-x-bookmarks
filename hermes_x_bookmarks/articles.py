@@ -56,6 +56,21 @@ def article_link_ids(post: Mapping[str, Any]) -> list[str]:
     return list(dict.fromkeys(found))
 
 
+def card_article_ids(post: Mapping[str, Any],
+                     included: Mapping[str, Mapping[str, Any]] | None = None) -> list[str]:
+    """Case (b2) only: Article links on a post that is not itself an Article and does not quote one.
+
+    Every Article post links to its own ``x.com/i/article/<n>``, and a quoted Article is case (b1),
+    so both are excluded. ``<n>`` is an article id, not a post id: it cannot be looked up.
+    """
+    if article_of(post):
+        return []
+    inc = included or {}
+    if any(article_of(inc.get(q)) for q in quoted_ids(post)):
+        return []
+    return article_link_ids(post)
+
+
 def quoted_ids(post: Mapping[str, Any]) -> list[str]:
     return [str(r.get("id")) for r in (post.get("referenced_tweets") or [])
             if isinstance(r, dict) and r.get("type") == "quoted" and r.get("id")]
