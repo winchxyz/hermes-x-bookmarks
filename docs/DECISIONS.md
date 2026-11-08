@@ -41,6 +41,12 @@ MCP as an option if its tool set covers database create + view + upsert.
 - **Phase 2 gate passed (2026-11-08, live):** first `hermes xbm sync` stored 1,880 bookmarks
   (213 Articles, all with full text) to the end of the list; the second sync made 1 request
   (20 posts, ~$0.02), found 0 new and stopped as caught up.
+- **Phase 3 first full run (2026-11-09, live):** 1,880 bookmarks sorted in 188 calls on the
+  owner's free default model (upstage/solar-mini4:free), 462k tokens in / 240k out, $0, no
+  failed call. After the per-block rule and about-me: `--sref` posts read as Midjourney style
+  codes, the owner's own posts are recognised, no repeated summaries. Weak spots of this small
+  model: why_saved often parrots the about-me text, and about-me pulls some crypto posts into
+  "AI & agents". A stronger model on the `xbm_classify` slot is the fix; owner review pending.
 - **Expansions (2026-11-08):** no `article.media_entities` by default (half of all billable
   expanded resources after 2026-11-22); incremental syncs use small pages and stop at known ids.
 
