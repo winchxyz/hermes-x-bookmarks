@@ -60,3 +60,8 @@ config_schema:
     default: "English"
     label: "Summary language"
     description: "Language of the one-line summary and the why-saved note, e.g. English or Russian."
+  about_me:
+    type: str
+    default: ""
+    label: "About you"
+    description: "A sentence or two on what you build and follow. Sorting uses it to judge priority. Set it with /xbm about <text>."

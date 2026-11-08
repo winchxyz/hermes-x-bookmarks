@@ -100,8 +100,39 @@ def test_trust_error_stops_and_is_reported():
         raise PluginLlmTrustError("task not allowed")
 
     res = classify.classify(FakeLlm(deny), store)
-    assert res.classified == 0 and res.failed == 15 and "task not allowed" in res.errors[0]
+    assert res.classified == 0 and res.failed == 10 and "task not allowed" in res.errors[0]
+    assert "refused" in res.stopped and res.remaining == 15
     assert store.last_runs(1)[0]["status"] == "error"
+
+
+def test_long_run_stops_after_three_failed_calls_in_row():
+    store = seeded(60)
+    calls = []
+
+    def flaky(kwargs, texts):
+        calls.append(1)
+        raise RuntimeError("429 rate limited")
+
+    res = classify.classify(FakeLlm(flaky), store, limit=None)
+    # first batch tries schema then json mode (2 calls); later batches json mode only
+    assert len(calls) == 4 and res.failed == 30 and "3 failed model calls in a row" in res.stopped
+    assert "Stopped early" in "\n".join(res.lines()) and res.remaining == 60
+
+
+def test_about_me_and_own_handle_reach_the_prompt_and_blocks_stay_separate():
+    store = seeded(2)
+    seen = {}
+
+    def spy(kwargs, texts):
+        seen["instr"] = kwargs["instructions"]
+        return good(kwargs, texts)
+
+    classify.classify(FakeLlm(spy), store, about_me="I build  Hermes plugins",
+                      own_username="me")
+    assert "About the person" in seen["instr"] and "I build Hermes plugins" in seen["instr"]
+    assert "@me" in seen["instr"] and "only by its own block" in seen["instr"]
+    classify.classify(FakeLlm(spy), seeded(1))
+    assert "About the person" not in seen["instr"] and "{about}" not in seen["instr"]
 
 
 def test_item_block_marks_untrusted_and_carries_context():
@@ -166,3 +197,8 @@ def test_commands_classify_status_list_and_register():
     assert "AI & agents · read · p1 · summary 1" in listing and listing.count("#") == 2
     assert "No category matches" in handler("list 5 cooking")
     assert "#3" in handler("list 5")
+    assert "No 'about me' set" in handler("about")
+    assert "Saved" in handler("about I build   Hermes plugins")
+    assert ctx.config["about_me"] == "I build Hermes plugins"
+    assert "I build Hermes plugins" in handler("about")
+    assert "cleared" in handler("about clear") and ctx.config["about_me"] == ""

@@ -19,8 +19,9 @@ COMMANDS = (
     ("classify", "Sort unsorted bookmarks with your Hermes model"),
     ("status", "How many bookmarks are stored, categories, last runs and their cost"),
     ("list", "Show the most recent stored bookmarks"),
+    ("about", "Show or set what you build and follow (used to judge priority)"),
 )
-COMMANDS_RUN = ("sync", "classify", "status", "list")
+COMMANDS_RUN = ("sync", "classify", "status", "list", "about")
 NEEDS_X = ("whoami", "probe", "sync")
 
 
@@ -47,6 +48,8 @@ def setup(parser: argparse.ArgumentParser) -> None:
             p.add_argument("--limit", type=int, default=20,
                            help="Sort at most this many, most recent first (default 20)")
             p.add_argument("--all", action="store_true", help="Sort every unsorted bookmark")
+        if name == "about":
+            p.add_argument("text", nargs="*", help="New text, or 'clear'; empty shows it")
 
 
 def say(line: str) -> None:
@@ -83,6 +86,8 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
                 words.extend(str(getattr(args, "category", "") or "").split())
             if cmd == "classify":
                 words.append("all" if args.all else str(max(1, args.limit)))
+            if cmd == "about":
+                words.extend(getattr(args, "text", None) or [])
             lines = commands.run(words, ctx=ctx, api_factory=build, db_factory=db_factory,
                                  overrides=_overrides(args), log=say,
                                  max_pages=getattr(args, "max_pages", None), classify_cap=None)

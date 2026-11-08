@@ -14,11 +14,13 @@ from .reader import Item
 from .store import Store, open_db
 from .xapi import XApi
 
-USAGE = ("Usage: /xbm sync [full] | classify [N|all] | status | list [N] [category]\n"
+USAGE = ("Usage: /xbm sync [full] | classify [N|all] | status | list [N] [category] | about\n"
          "  sync      pull new bookmarks from X (full: re-read all of them)\n"
          "  classify  sort unsorted bookmarks with your model (default 20 at a time)\n"
          "  status    counts, categories, last runs, X API and model cost\n"
-         "  list      the N most recent bookmarks (default 10), optionally of one category")
+         "  list      the N most recent bookmarks (default 10), optionally of one category\n"
+         "  about     what you build and follow, so sorting can judge priority "
+         "(about <text> | about clear)")
 
 CHAT_CLASSIFY_DEFAULT = 20
 CHAT_CLASSIFY_MAX = 100  # a chat command blocks its turn; bigger runs belong in the terminal
@@ -27,7 +29,8 @@ TCO = re.compile(r"https?://t\.co/\S*")
 
 ApiFactory = Callable[[dict[str, Any]], XApi]
 DbFactory = Callable[[], sqlite3.Connection]
-CONFIG_KEYS = ("auth_backend", "xurl_app", "categories", "classify_language")
+CONFIG_KEYS = ("auth_backend", "xurl_app", "categories", "classify_language",
+               "about_me")
 
 
 def config_of(ctx: Any, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -59,7 +62,9 @@ def do_classify(llm: Any, store: Store, cfg: dict[str, Any], *, limit: int | Non
         return ["No bookmarks stored yet. Run /xbm sync first."]
     res = classify.classify(llm, store, limit=limit,
                             categories=classify.categories_from(cfg.get("categories")),
-                            language=str(cfg.get("classify_language") or "English"), log=log)
+                            language=str(cfg.get("classify_language") or "English"),
+                            about_me=str(cfg.get("about_me") or ""),
+                            own_username=store.get_meta("x_username"), log=log)
     return res.lines()
 
 
@@ -147,6 +152,26 @@ def do_list(store: Store, n: int = 10, category: str = "") -> list[str]:
     return out
 
 
+def do_about(ctx: Any, rest: list[str]) -> list[str]:
+    from .classify import ABOUT_MAX
+
+    current = str(config_of(ctx).get("about_me") or "")
+    if not rest:
+        if not current:
+            return ["No 'about me' set. Example: /xbm about I build Hermes Agent plugins and "
+                    "follow AI agents and crypto security."]
+        return [f"About you (used to judge priority): {current}"]
+    setter = getattr(ctx, "set_config", None) if ctx is not None else None
+    if setter is None:
+        return ["Cannot save settings here: run it inside Hermes."]
+    text = "" if [w.lower() for w in rest] == ["clear"] else " ".join(" ".join(rest).split())
+    setter("about_me", text[:ABOUT_MAX])
+    if not text:
+        return ["'About me' cleared."]
+    note = f" (cut to {ABOUT_MAX} characters)" if len(text) > ABOUT_MAX else ""
+    return [f"Saved{note}. Sorting runs from now on use it."]
+
+
 def _llm_of(ctx: Any) -> Any:
     try:
         return getattr(ctx, "llm", None) if ctx is not None else None
@@ -160,8 +185,10 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
         classify_cap: int | None = CHAT_CLASSIFY_MAX) -> list[str]:
     """Run one subcommand given as words (``["sync", "full"]``, ``["list", "5", "ai"]``)."""
     cmd = words[0].lower() if words else ""
-    if cmd not in ("sync", "classify", "status", "list"):
+    if cmd not in ("sync", "classify", "status", "list", "about"):
         return [USAGE]
+    if cmd == "about":
+        return do_about(ctx, words[1:])
     conn = (db_factory or open_db)()
     try:
         store = Store(conn)

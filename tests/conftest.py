@@ -52,6 +52,9 @@ class FakeCtx:
     def get_config(self, key, default=None):
         return self.config.get(key, default)
 
+    def set_config(self, key, value):
+        self.config[key] = value
+
     def register_auxiliary_task(self, key, *, display_name, description, defaults=None,
                                 inherit_from=None):
         self.aux_tasks[key] = {"display_name": display_name, "inherit_from": inherit_from}
