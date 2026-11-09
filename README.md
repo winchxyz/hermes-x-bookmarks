@@ -55,6 +55,8 @@ Uses the official X API only: no scraping, no browser automation, read-only acce
   creates it through Hermes' own `skill_manage`, where Hermes may ask you to approve it. Posts
   with no repeatable procedure get no skill. Your notes stay in the exports above.
 
+![The weekly digest in a chat, with "task 3" and "skill 2" replies (demo data)](docs/media/digest.png)
+
 ## Setup
 
 ### 1. Your own X developer app
