@@ -43,7 +43,10 @@ columns by status). Screenshot of the board for the owner.
 - Built in 0.3.0 (2026-11-09): `/xbm digest`, `task`/`tasks`/`done`, `skill N [save]`,
   `schedule`/`unschedule`, tools `xbm_digest`/`xbm_task`/`xbm_skill`, blueprint
   `weekly-digest`. "Note" was dropped: the exports already are the notes. The approval step is
-  Hermes' own (`skill_manage` stages skill writes). Gate run live: pending.
+  Hermes' own (`skill_manage` stages skill writes). Live 2026-11-09: `/xbm digest` with the
+  owner's model (1,880 bookmarks, overview and 3 post ideas), `/xbm task 3`, a bare "task 1" in a
+  new chat (agent found `xbm_task` through tool search and added it), `/xbm schedule` (Hermes cron
+  job, next run 2026-11-15 18:00). Still to see: the first scheduled delivery on 2026-11-15.
 
 ## Day 4 — Google Docs, polish, release
 

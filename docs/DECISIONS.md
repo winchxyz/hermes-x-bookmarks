@@ -87,7 +87,8 @@ as the fallback (see "Made" below).
   searched the disk. Fix: a `pre_llm_call` hook that, only for a message that is just
   "task|skill|done N" and only with a digest from the last 8 days, adds a note naming the item
   and the tool. Chosen over `pre_gateway_dispatch` rewriting (gateway only, and it would take
-  "task 3" away from the agent even when the user means something else).
+  "task 3" away from the agent even when the user means something else). Checked live: a bare
+  "task 1" in a new chat became a task (the agent loaded `xbm_task` through tool search).
 - Skills are drafted by the plugin (model call with a fixed schema, post text as data) and
   created only on `save`, through Hermes' `skill_manage`, so Hermes' approval gate and skill
   ledger apply. No "note" action: the exports are the notes.
