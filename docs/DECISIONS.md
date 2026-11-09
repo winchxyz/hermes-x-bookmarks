@@ -63,7 +63,8 @@ as the fallback (see "Made" below).
   Live 2026-11-09 (0.2.2, chat through the gateway): database and boards created, 300 pages in
   one chat export, all 300 page ids read back (distinct). The connector rejects select and
   multi-select values that are not options yet; 0.2.2 learns the allowed values from that error.
-  Not checked: whether `hermes xbm ...` in a terminal reaches the connector. The gateway loads
+  0.2.3 (no page cap in chat): all 1,880 bookmarks in Notion, 1,880 distinct page ids, no
+  duplicates. Not checked: whether `hermes xbm ...` in a terminal reaches the connector. The gateway loads
   plugin code once: after a plugin update, `hermes gateway restart`.
 - Notion, token route: `api.notion.com` with the user's connection token from the secret scope
   (`XBM_NOTION_TOKEN`). Export state (item -> page id, content hash) lives in the plugin
