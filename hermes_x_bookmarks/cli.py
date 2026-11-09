@@ -17,7 +17,7 @@ COMMANDS = (
     ("probe", "Day-1 spike: ask X how bookmarks and Articles come back"),
     ("sync", "Pull new bookmarks from X into the local store"),
     ("classify", "Sort unsorted bookmarks with your Hermes model"),
-    ("export", "Write bookmarks.md and board.html to 'X Bookmarks' on your Desktop"),
+    ("export", "Write bookmarks out: desktop (board + Markdown), obsidian, notion, gdocs"),
     ("status", "How many bookmarks are stored, categories, last runs and their cost"),
     ("list", "Show the most recent stored bookmarks"),
     ("about", "Show or set what you build and follow (used to judge priority)"),
@@ -50,6 +50,9 @@ def setup(parser: argparse.ArgumentParser) -> None:
                            help="Sort at most this many, most recent first (default 20)")
             p.add_argument("--all", action="store_true", help="Sort every unsorted bookmark")
         if name == "export":
+            p.add_argument("where", nargs="*",
+                           help="desktop, obsidian, notion [page URL], gdocs or all "
+                                "(default: the export_to setting, else desktop)")
             p.add_argument("--dir", default=None,
                            help="Folder to write to (default: the export_dir setting, else "
                                 "'X Bookmarks' on your Desktop)")
@@ -94,6 +97,8 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
                 words.append("all" if args.all else str(max(1, args.limit)))
             if cmd == "about":
                 words.extend(getattr(args, "text", None) or [])
+            if cmd == "export":
+                words.extend(getattr(args, "where", None) or [])
             lines = commands.run(words, ctx=ctx, api_factory=build, db_factory=db_factory,
                                  overrides=_overrides(args), log=say,
                                  max_pages=getattr(args, "max_pages", None), classify_cap=None)

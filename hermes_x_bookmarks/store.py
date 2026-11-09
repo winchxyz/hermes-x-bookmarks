@@ -15,7 +15,7 @@ from typing import Any
 
 from .reader import Item
 
-SCHEMA_VERSION = 2  # 2: classes
+SCHEMA_VERSION = 3  # 2: classes, 3: exports
 RUN_SPAN = 10_000_000  # more new bookmarks than one run can ever bring
 
 SCHEMA = """
@@ -60,6 +60,14 @@ CREATE TABLE IF NOT EXISTS classes (
     created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS classes_category ON classes(category);
+CREATE TABLE IF NOT EXISTS exports (
+    target TEXT NOT NULL,
+    item_id TEXT NOT NULL,
+    remote_id TEXT NOT NULL,
+    hash TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (target, item_id)
+);
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -228,6 +236,21 @@ class Store:
                 label["tags"] = json.loads(r["tags"] or "[]")
             out.append((Item.from_dict(json.loads(r["data"])), label))
         return out
+
+    # exports to Notion etc. -----------------------------------------------------------------
+    def export_map(self, target: str) -> dict[str, tuple[str, str]]:
+        """item id -> (remote id, content hash) of what was last written to ``target``."""
+        rows = self.conn.execute("SELECT item_id, remote_id, hash FROM exports WHERE target = ?",
+                                 (target,))
+        return {r["item_id"]: (r["remote_id"], r["hash"]) for r in rows}
+
+    def save_export(self, target: str, item_id: str, remote_id: str, hash_: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO exports(target, item_id, remote_id, hash, updated_at) "
+                "VALUES(?, ?, ?, ?, ?) ON CONFLICT(target, item_id) DO UPDATE SET "
+                "remote_id = excluded.remote_id, hash = excluded.hash, "
+                "updated_at = excluded.updated_at", (target, item_id, remote_id, hash_, now_iso()))
 
     def category_counts(self) -> list[tuple[str, int]]:
         rows = self.conn.execute(

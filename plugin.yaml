@@ -1,13 +1,13 @@
 manifest_version: 2
 name: hermes-x-bookmarks
-version: "0.1.0"
-description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and puts them on a board on your Desktop."
+version: "0.2.0"
+description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and exports them to a Desktop board, Obsidian, Notion or Google Docs."
 author: winchxyz
 kind: standalone
 license: MIT
 homepage: https://github.com/winchxyz/hermes-x-bookmarks
 requires_hermes: ">=0.23.0"
-tags: [x, twitter, bookmarks, notion, productivity]
+tags: [x, twitter, bookmarks, notion, obsidian, google-docs, productivity]
 provides_tools: []
 provides_hooks: []
 optional_env:
@@ -29,6 +29,18 @@ optional_env:
   - name: XBM_X_CLIENT_ID
     description: "OAuth 2.0 Client ID of your own X developer app (Native App, read-only). Sign in with `hermes auth add hermes-x-bookmarks:x`."
     url: "https://console.x.com"
+  # Notion export: token of your own Notion connection (internal integration or personal access token).
+  - name: XBM_NOTION_TOKEN
+    description: "Notion connection token for /xbm export notion. Share one page with the connection."
+    url: "https://www.notion.so/profile/integrations"
+    secret: true
+  # Google Docs export: your own Google Cloud OAuth client (type Desktop app), scope drive.file only.
+  - name: XBM_GOOGLE_CLIENT_ID
+    description: "Client ID of your own Google Cloud OAuth client (Desktop app). Sign in with `hermes auth add hermes-x-bookmarks:google`."
+    url: "https://console.cloud.google.com/auth/clients"
+  - name: XBM_GOOGLE_CLIENT_SECRET
+    description: "Client secret of that Google Desktop app client"
+    secret: true
 # Hermes runs the X sign-in, stores the grant in this profile's auth.json and refreshes it.
 # The plugin never holds a token: every X call goes through credentialed_provider_request("x", ...).
 oauth:
@@ -38,6 +50,17 @@ oauth:
     scopes: [tweet.read, users.read, bookmark.read, offline.access]
     client_id_env: XBM_X_CLIENT_ID
     hosts: [api.x.com]
+  # Google Docs export. drive.file: only the document this plugin creates, nothing else in Drive.
+  - id: google
+    authorize_url: https://accounts.google.com/o/oauth2/v2/auth
+    token_url: https://oauth2.googleapis.com/token
+    scopes: [https://www.googleapis.com/auth/drive.file]
+    client_id_env: XBM_GOOGLE_CLIENT_ID
+    client_secret_env: XBM_GOOGLE_CLIENT_SECRET
+    hosts: [docs.googleapis.com]
+    authorize_params:
+      access_type: offline
+      prompt: consent
 config_schema:
   auth_backend:
     type: str
@@ -69,4 +92,19 @@ config_schema:
     type: str
     default: ""
     label: "Export folder"
-    description: "Where /xbm export writes bookmarks.md and board.html. Empty: an 'X Bookmarks' folder on your Desktop."
+    description: "Where /xbm export desktop writes bookmarks.md and board.html. Empty: an 'X Bookmarks' folder on your Desktop."
+  export_to:
+    type: str
+    default: "desktop"
+    label: "Export to"
+    description: "What a plain /xbm export writes, comma-separated: desktop, obsidian, notion, gdocs."
+  obsidian_vault:
+    type: str
+    default: ""
+    label: "Obsidian vault"
+    description: "Folder of your Obsidian vault. Notes go to its 'X Bookmarks' folder. Empty: the vault Obsidian has open."
+  notion_page:
+    type: str
+    default: ""
+    label: "Notion page"
+    description: "URL of the Notion page that holds the X Bookmarks database. Share it with your Notion connection first."

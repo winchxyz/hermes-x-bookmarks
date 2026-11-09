@@ -14,11 +14,13 @@ from .reader import Item
 from .store import Store, open_db
 from .xapi import XApi
 
-USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export | status | list [N] [category]"
-         " | about\n"
+USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export [where] | status"
+         " | list [N] [category] | about\n"
          "  sync      pull new bookmarks from X (full: re-read all of them)\n"
          "  classify  sort unsorted bookmarks with your model (default 20 at a time)\n"
-         "  export    write bookmarks.md and board.html to 'X Bookmarks' on your Desktop\n"
+         "  export    write your bookmarks out; where: desktop, obsidian, notion [page URL],"
+         " gdocs\n"
+         "            (several allowed; default: the export_to setting, else desktop)\n"
          "  status    counts, categories, last runs, X API and model cost\n"
          "  list      the N most recent bookmarks (default 10), optionally of one category\n"
          "  about     what you build and follow, so sorting can judge priority "
@@ -26,13 +28,18 @@ USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export | status | list [N
 
 CHAT_CLASSIFY_DEFAULT = 20
 CHAT_CLASSIFY_MAX = 100  # a chat command blocks its turn; bigger runs belong in the terminal
+CHAT_NOTION_MAX = 100    # Notion pages per chat export (about 40 s); the terminal has no cap
+TARGETS = ("desktop", "obsidian", "notion", "gdocs")
+TARGET_ALIASES = {"local": "desktop", "md": "desktop", "html": "desktop", "board": "desktop",
+                  "google": "gdocs", "docs": "gdocs", "gdoc": "gdocs", "googledocs": "gdocs",
+                  "vault": "obsidian"}
 
 TCO = re.compile(r"https?://t\.co/\S*")
 
 ApiFactory = Callable[[dict[str, Any]], XApi]
 DbFactory = Callable[[], sqlite3.Connection]
 CONFIG_KEYS = ("auth_backend", "xurl_app", "categories", "classify_language",
-               "about_me", "export_dir")
+               "about_me", "export_dir", "export_to", "obsidian_vault", "notion_page")
 
 
 def config_of(ctx: Any, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -154,21 +161,78 @@ def do_list(store: Store, n: int = 10, category: str = "") -> list[str]:
     return out
 
 
-def do_export(store: Store, cfg: dict[str, Any]) -> list[str]:
-    from . import export_local
+def parse_targets(words: list[str], default: str = "") -> tuple[list[str], str, list[str]]:
+    """(targets, Notion page URL if given, unknown words) from ``export`` arguments."""
+    targets: list[str] = []
+    page = ""
+    unknown: list[str] = []
+    for w in words:
+        low = w.lower().strip(",")
+        if "notion." in low or (len(low.replace("-", "")) == 32 and "notion" in targets):
+            page = w
+            if "notion" not in targets:
+                targets.append("notion")
+            continue
+        name = TARGET_ALIASES.get(low, low)
+        if name == "all":
+            targets += [t for t in TARGETS if t not in targets]
+        elif name in TARGETS:
+            if name not in targets:
+                targets.append(name)
+        elif low:
+            unknown.append(w)
+    if not targets and not unknown:
+        for w in str(default or "desktop").replace(",", " ").split():
+            name = TARGET_ALIASES.get(w.lower(), w.lower())
+            if name in TARGETS and name not in targets:
+                targets.append(name)
+    return targets or ([] if unknown else ["desktop"]), page, unknown
+
+
+def do_export(store: Store, cfg: dict[str, Any], words: list[str] | None = None, *,
+              ctx: Any = None, notion_limit: int | None = CHAT_NOTION_MAX,
+              log: Callable[[str], None] | None = None) -> list[str]:
+    from .classify import SCHEMA_VERSION, categories_from
 
     if store.count() == 0:
         return ["No bookmarks stored yet. Run /xbm sync first."]
-    try:
-        res = export_local.export(store, export_dir=str(cfg.get("export_dir") or "") or None)
-    except OSError as exc:
-        return [f"Export failed: {exc}"]
-    from .classify import SCHEMA_VERSION
+    targets, page, unknown = parse_targets(words or [], str(cfg.get("export_to") or ""))
+    if unknown:
+        return [f"Unknown export target: {' '.join(unknown)}. Use: desktop, obsidian, notion, "
+                "gdocs or all."]
+    lines: list[str] = []
+    for target in targets:
+        try:
+            if target == "desktop":
+                from . import export_local
 
-    lines = res.lines()
+                lines += export_local.export(
+                    store, export_dir=str(cfg.get("export_dir") or "") or None).lines()
+            elif target == "obsidian":
+                from . import obsidian
+
+                lines += obsidian.export(store, vault=str(cfg.get("obsidian_vault") or "")).lines()
+            elif target == "notion":
+                from . import notion, secrets
+
+                if page:
+                    setter = getattr(ctx, "set_config", None) if ctx is not None else None
+                    if setter:
+                        setter("notion_page", page)
+                lines += notion.export(
+                    store, parent=page or str(cfg.get("notion_page") or ""),
+                    categories=categories_from(cfg.get("categories")),
+                    token=secrets.get(notion.TOKEN_ENV), limit=notion_limit, log=log).lines()
+            elif target == "gdocs":
+                from . import gdocs
+
+                lines += gdocs.export(store).lines()
+        except Exception as exc:  # noqa: BLE001 - one target failing must not stop the others
+            name = getattr(exc, "strerror", None) or str(exc) or type(exc).__name__
+            lines.append(f"{target} export failed: {name}")
     unsorted = store.count_unclassified(SCHEMA_VERSION)
     if unsorted:
-        lines.append(f"{unsorted} bookmark(s) are not sorted yet (column 'Unsorted'); "
+        lines.append(f"{unsorted} bookmark(s) are not sorted yet (category 'Unsorted'); "
                      "/xbm classify sorts them.")
     return lines
 
@@ -222,7 +286,8 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
             return do_list(store, n, cat)
         cfg = config_of(ctx, overrides)
         if cmd == "export":
-            return do_export(store, cfg)
+            return do_export(store, cfg, rest, ctx=ctx, log=log,
+                             notion_limit=CHAT_NOTION_MAX if classify_cap is not None else None)
         if cmd == "classify":
             limit: int | None = CHAT_CLASSIFY_DEFAULT
             if rest and rest[0].isdigit():

@@ -58,7 +58,15 @@ MCP as an option if its tool set covers database create + view + upsert.
 - Official X API only. No scraping, internal x.com endpoints or browser automation.
 - LLM through the user's Hermes model (`ctx.llm`); no plugin-owned AI key.
 - Local export ships first (works with no accounts), then Notion, then Google Docs.
-- Google Docs via Drive HTML upload with conversion, scope `drive.file` only.
+- Google Docs via the Docs API (create + batchUpdate), scope `drive.file` only. Changed from
+  the planned Drive HTML upload (2026-11-09): Hermes' `credentialed_provider_request` sends JSON
+  bodies only, so a multipart upload is impossible without holding the token ourselves (rule 11).
+  The same document is rewritten in place (delete range + insert), so its link stays.
+- Notion talks to `api.notion.com` with the user's connection token from the secret scope
+  (`XBM_NOTION_TOKEN`); no Notion OAuth. Export state (item -> page id, content hash) lives in
+  the plugin database, so unchanged pages cost no request.
+- Obsidian notes are found again by `tweet_id` front matter, not by file name; only the
+  plugin's keys are rewritten.
 - No tokens in plugin data (catalog rule 11). Hermes or xurl hold them.
 - Schedules are Hermes cron jobs created from blueprints / `/xbm schedule`, not our own loop.
 - httpx for every HTTP API; no vendor SDKs.

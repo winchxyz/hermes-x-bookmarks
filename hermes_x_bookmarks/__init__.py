@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 PLUGIN_NAME = "hermes-x-bookmarks"
 
@@ -28,7 +28,8 @@ def register(ctx: Any) -> None:
     ctx.register_command(
         "xbm", commands.make_slash_handler(ctx),
         description="X bookmarks: sync, classify, export, status, list, about",
-        args_hint="sync [full] | classify [N] | export | status | list [N] [category] | about")
+        args_hint=("sync [full] | classify [N] | export [desktop|obsidian|notion|gdocs]"
+                   " | status | list [N] [category] | about"))
     ctx.register_cli_command(
         name="xbm", help="X bookmarks: sign-in check, sync, classify, export, status, list",
         setup_fn=cli.setup, handler_fn=cli.make_handler(ctx),

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hermes-x-bookmarks"
-version = "0.1.0"
+version = "0.2.0"
 description = "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and puts them on a board on your Desktop (Hermes Agent plugin)."
 readme = "README.md"
 requires-python = ">=3.11"

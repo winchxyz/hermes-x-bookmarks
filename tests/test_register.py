@@ -21,8 +21,7 @@ def test_register_matches_manifest():
 
 
 def test_oauth_entry_is_read_only_public_client():
-    (entry,) = MANIFEST["oauth"]
-    assert entry["id"] == "x"
+    entry = next(e for e in MANIFEST["oauth"] if e["id"] == "x")
     assert entry["hosts"] == ["api.x.com"]
     assert set(entry["scopes"]) == {"tweet.read", "users.read", "bookmark.read", "offline.access"}
     assert "client_secret_env" not in entry  # Native App: PKCE, no secret on disk
@@ -30,8 +29,23 @@ def test_oauth_entry_is_read_only_public_client():
     assert entry["client_id_env"] in declared
 
 
+def test_google_entry_only_touches_files_it_made():
+    entry = next(e for e in MANIFEST["oauth"] if e["id"] == "google")
+    assert entry["scopes"] == ["https://www.googleapis.com/auth/drive.file"]
+    assert entry["hosts"] == ["docs.googleapis.com"]
+    assert entry["authorize_params"]["access_type"] == "offline"
+    declared = {e["name"] for e in MANIFEST.get("optional_env") or []}
+    assert {entry["client_id_env"], entry["client_secret_env"]} <= declared
+
+
 def test_plugin_code_never_names_the_token_url():
     # Hermes refreshes the grant; validate warns when plugin code names the token URL.
-    token_url = MANIFEST["oauth"][0]["token_url"]
-    for path in (ROOT / "hermes_x_bookmarks").rglob("*.py"):
-        assert token_url not in path.read_text(encoding="utf-8"), path
+    for entry in MANIFEST["oauth"]:
+        for path in (ROOT / "hermes_x_bookmarks").rglob("*.py"):
+            assert entry["token_url"] not in path.read_text(encoding="utf-8"), path
+
+
+def test_new_settings_are_in_the_manifest():
+    from hermes_x_bookmarks.commands import CONFIG_KEYS
+
+    assert set(CONFIG_KEYS) <= set(MANIFEST["config_schema"])
