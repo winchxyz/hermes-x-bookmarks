@@ -1,14 +1,14 @@
 manifest_version: 2
 name: hermes-x-bookmarks
-version: "0.2.3"
-description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and exports them to a Desktop board, Obsidian, Notion or Google Docs."
+version: "0.3.0"
+description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and exports them to a Desktop board, Obsidian, Notion or Google Docs. A weekly digest turns the best ones into tasks or Hermes skills."
 author: winchxyz
 kind: standalone
 license: MIT
 homepage: https://github.com/winchxyz/hermes-x-bookmarks
 requires_hermes: ">=0.23.0"
 tags: [x, twitter, bookmarks, notion, obsidian, google-docs, productivity]
-provides_tools: []
+provides_tools: [xbm_digest, xbm_task, xbm_skill]
 provides_hooks: []
 optional_env:
   # X sign-in, option 1 (simplest): OAuth 1.0a keys of your own X app (Keys and tokens page).

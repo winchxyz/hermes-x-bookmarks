@@ -21,8 +21,17 @@ COMMANDS = (
     ("status", "How many bookmarks are stored, categories, last runs and their cost"),
     ("list", "Show the most recent stored bookmarks"),
     ("about", "Show or set what you build and follow (used to judge priority)"),
+    ("digest", "The last 7 days of bookmarks: overview, the best ones numbered, post ideas"),
+    ("task", "Make item N of the latest digest a task: task N [note]"),
+    ("tasks", "List open tasks"),
+    ("done", "Finish a task: done N (its number in 'tasks')"),
+    ("skill", "Draft a Hermes skill from item N: skill N; skill N save creates it"),
+    ("schedule", "Send the digest weekly as a Hermes cron job (default: every sunday 6pm)"),
+    ("unschedule", "Stop the weekly digest"),
 )
-COMMANDS_RUN = ("sync", "classify", "export", "status", "list", "about")
+COMMANDS_RUN = ("sync", "classify", "export", "status", "list", "about", "digest", "task",
+                "tasks", "done", "skill", "schedule", "unschedule")
+WORDS = ("digest", "task", "done", "skill", "schedule")
 NEEDS_X = ("whoami", "probe", "sync")
 
 
@@ -58,6 +67,11 @@ def setup(parser: argparse.ArgumentParser) -> None:
                                 "'X Bookmarks' on your Desktop)")
         if name == "about":
             p.add_argument("text", nargs="*", help="New text, or 'clear'; empty shows it")
+        if name in WORDS:
+            p.add_argument("words", nargs="*", help={
+                "digest": "Days back (default 7)", "task": "Item number, then an optional note",
+                "done": "Task number", "skill": "Item number, then 'save' to create it",
+                "schedule": "When, e.g. every monday 9am (default: every sunday 6pm)"}[name])
 
 
 def say(line: str) -> None:
@@ -99,6 +113,8 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
                 words.extend(getattr(args, "text", None) or [])
             if cmd == "export":
                 words.extend(getattr(args, "where", None) or [])
+            if cmd in WORDS:
+                words.extend(getattr(args, "words", None) or [])
             lines = commands.run(words, ctx=ctx, api_factory=build, db_factory=db_factory,
                                  overrides=_overrides(args), log=say,
                                  max_pages=getattr(args, "max_pages", None), classify_cap=None)

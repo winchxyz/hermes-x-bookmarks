@@ -40,6 +40,10 @@ columns by status). Screenshot of the board for the owner.
 `xbm_to_note`, `xbm_to_skill` (draft, show, `skill_manage`), approval hook, blueprints and
 `/xbm schedule`.
 - Gate: a scheduled digest reaches the owner's chat and a reply turns item #3 into a task.
+- Built in 0.3.0 (2026-11-09): `/xbm digest`, `task`/`tasks`/`done`, `skill N [save]`,
+  `schedule`/`unschedule`, tools `xbm_digest`/`xbm_task`/`xbm_skill`, blueprint
+  `weekly-digest`. "Note" was dropped: the exports already are the notes. The approval step is
+  Hermes' own (`skill_manage` stages skill writes). Gate run live: pending.
 
 ## Day 4 — Google Docs, polish, release
 

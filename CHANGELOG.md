@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.3.0 (2026-11-09)
+
+Digest and actions.
+
+- `/xbm digest [days]`: counts per category, an overview and 3 post ideas from your model, and
+  the 10 best bookmarks numbered (your own posts left out). The first digest says it covers
+  everything stored so far.
+- `/xbm task N [note]`, `/xbm tasks`, `/xbm done N`: tasks from digest items (or a post id or
+  x.com link), kept in plugin data.
+- `/xbm skill N` drafts a Hermes skill from a post and shows it; `/xbm skill N save` creates it
+  through Hermes' `skill_manage` (Hermes may stage it for your approval). Posts with no
+  repeatable procedure get no skill.
+- `/xbm schedule [when]` / `/xbm unschedule`: the digest as a weekly Hermes cron job in the chat
+  it was set up from, continuable so a reply like "task 3" works; quiet when nothing is new.
+  Also an Automation Blueprint, "X bookmarks weekly digest".
+- Agent tools `xbm_digest`, `xbm_task`, `xbm_skill` (toolset `x_bookmarks`) and a second model
+  slot, "X bookmarks: digest and skills" (`xbm_digest`).
+- Plugin data schema 4: digests, tasks and skill drafts.
+
 ## 0.2.3 (2026-11-09)
 
 - A chat export writes all bookmarks in one go (no 100/300 page cap: Hermes runs plugin

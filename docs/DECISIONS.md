@@ -75,5 +75,15 @@ as the fallback (see "Made" below).
   plugin's keys are rewritten.
 - No tokens in plugin data (catalog rule 11). Hermes or xurl hold them.
 - Schedules are Hermes cron jobs created from blueprints / `/xbm schedule`, not our own loop.
+  0.3.0: `/xbm schedule` calls `cronjob_manage` create with `attach_to_session: true` (so a reply
+  to the digest continues that conversation), `enabled_toolsets: ["x_bookmarks"]` and no
+  `deliver` (= the chat it was set up from). The job id is the only thing kept; `[SILENT]` when
+  nothing is new. The job outlives the plugin until removed.
+- Digest window = bookmarks first stored in the last N days (X does not say when you
+  bookmarked a post). Digest numbers refer to the latest digest; `/xbm tasks` has its own
+  numbers for `done`.
+- Skills are drafted by the plugin (model call with a fixed schema, post text as data) and
+  created only on `save`, through Hermes' `skill_manage`, so Hermes' approval gate and skill
+  ledger apply. No "note" action: the exports are the notes.
 - httpx for every HTTP API; no vendor SDKs.
 - Article bodies are plain text from the API; exports say so.

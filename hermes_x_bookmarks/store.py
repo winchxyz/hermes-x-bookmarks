@@ -15,7 +15,7 @@ from typing import Any
 
 from .reader import Item
 
-SCHEMA_VERSION = 3  # 2: classes, 3: exports
+SCHEMA_VERSION = 4  # 2: classes, 3: exports, 4: digests, tasks, skill drafts
 RUN_SPAN = 10_000_000  # more new bookmarks than one run can ever bring
 
 SCHEMA = """
@@ -71,6 +71,26 @@ CREATE TABLE IF NOT EXISTS exports (
 CREATE TABLE IF NOT EXISTS meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS digests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL,
+    since TEXT NOT NULL,
+    item_ids TEXT NOT NULL DEFAULT '[]',
+    text TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS tasks (
+    item_id TEXT PRIMARY KEY,
+    note TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    done_at TEXT
+);
+CREATE TABLE IF NOT EXISTS skill_drafts (
+    item_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    saved_at TEXT
 );
 """
 
@@ -251,6 +271,69 @@ class Store:
                 "VALUES(?, ?, ?, ?, ?) ON CONFLICT(target, item_id) DO UPDATE SET "
                 "remote_id = excluded.remote_id, hash = excluded.hash, "
                 "updated_at = excluded.updated_at", (target, item_id, remote_id, hash_, now_iso()))
+
+    # digest, tasks, skill drafts ----------------------------------------------------------
+    def seen_since(self, since: str) -> list[tuple[Item, dict[str, Any] | None]]:
+        """Bookmarks first stored at or after ``since`` (ISO UTC), most recent bookmark first."""
+        ids = {r["id"] for r in self.conn.execute(
+            "SELECT id FROM items WHERE removed_at IS NULL AND first_seen_at >= ?", (since,))}
+        return [(i, lab) for i, lab in self.labelled_items() if i.id in ids]
+
+    def save_digest(self, since: str, item_ids: list[str], text: str) -> int:
+        with self.conn:
+            cur = self.conn.execute(
+                "INSERT INTO digests(created_at, since, item_ids, text) VALUES(?, ?, ?, ?)",
+                (now_iso(), since, json.dumps(item_ids), text))
+        return int(cur.lastrowid or 0)
+
+    def last_digest(self) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM digests ORDER BY id DESC LIMIT 1").fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["item_ids"] = json.loads(d["item_ids"] or "[]")
+        return d
+
+    def add_task(self, item_id: str, note: str = "") -> bool:
+        """True when the task is new (an open or done task for the item is reopened)."""
+        with self.conn:
+            known = self.conn.execute("SELECT done_at FROM tasks WHERE item_id = ?",
+                                      (item_id,)).fetchone()
+            self.conn.execute(
+                "INSERT INTO tasks(item_id, note, created_at) VALUES(?, ?, ?) "
+                "ON CONFLICT(item_id) DO UPDATE SET done_at = NULL, "
+                "note = CASE WHEN excluded.note != '' THEN excluded.note ELSE tasks.note END",
+                (item_id, note, now_iso()))
+        return known is None
+
+    def finish_task(self, item_id: str) -> bool:
+        with self.conn:
+            cur = self.conn.execute("UPDATE tasks SET done_at = ? WHERE item_id = ? AND "
+                                    "done_at IS NULL", (now_iso(), item_id))
+        return cur.rowcount > 0
+
+    def open_tasks(self) -> list[dict[str, Any]]:
+        rows = self.conn.execute("SELECT item_id, note, created_at FROM tasks WHERE done_at IS "
+                                 "NULL ORDER BY created_at, item_id")
+        return [dict(r) for r in rows]
+
+    def save_skill_draft(self, item_id: str, name: str, content: str) -> None:
+        with self.conn:
+            self.conn.execute(
+                "INSERT INTO skill_drafts(item_id, name, content, created_at) VALUES(?, ?, ?, ?) "
+                "ON CONFLICT(item_id) DO UPDATE SET name = excluded.name, "
+                "content = excluded.content, created_at = excluded.created_at, saved_at = NULL",
+                (item_id, name, content, now_iso()))
+
+    def skill_draft(self, item_id: str) -> dict[str, Any] | None:
+        row = self.conn.execute("SELECT * FROM skill_drafts WHERE item_id = ?",
+                                (item_id,)).fetchone()
+        return dict(row) if row else None
+
+    def mark_skill_saved(self, item_id: str) -> None:
+        with self.conn:
+            self.conn.execute("UPDATE skill_drafts SET saved_at = ? WHERE item_id = ?",
+                              (now_iso(), item_id))
 
     def category_counts(self) -> list[tuple[str, int]]:
         rows = self.conn.execute(

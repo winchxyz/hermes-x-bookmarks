@@ -14,17 +14,27 @@ from .reader import Item
 from .store import Store, open_db
 from .xapi import XApi
 
-USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export [where] | status"
+USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export [where] | digest [days] | task N"
+         " | tasks | done N | skill N [save] | schedule [when] | unschedule | status"
          " | list [N] [category] | about\n"
-         "  sync      pull new bookmarks from X (full: re-read all of them)\n"
-         "  classify  sort unsorted bookmarks with your model (default 20 at a time)\n"
-         "  export    write your bookmarks out; where: desktop, obsidian, notion [page URL],"
+         "  sync       pull new bookmarks from X (full: re-read all of them)\n"
+         "  classify   sort unsorted bookmarks with your model (default 20 at a time)\n"
+         "  export     write your bookmarks out; where: desktop, obsidian, notion [page URL],"
          " gdocs\n"
-         "            (several allowed; default: the export_to setting, else desktop)\n"
-         "  status    counts, categories, last runs, X API and model cost\n"
-         "  list      the N most recent bookmarks (default 10), optionally of one category\n"
-         "  about     what you build and follow, so sorting can judge priority "
+         "             (several allowed; default: the export_to setting, else desktop)\n"
+         "  digest     the last 7 days (or N days): counts, overview, the best ones numbered,"
+         " 3 post ideas\n"
+         "  task N     make item N of the latest digest a task (task N <note> adds a note);"
+         " tasks lists them, done N finishes one\n"
+         "  skill N    draft a Hermes skill from item N; skill N save creates it\n"
+         "  schedule   send the digest every week as a Hermes cron job (default: every sunday"
+         " 6pm); unschedule stops it\n"
+         "  status     counts, categories, last runs, X API and model cost\n"
+         "  list       the N most recent bookmarks (default 10), optionally of one category\n"
+         "  about      what you build and follow, so sorting can judge priority "
          "(about <text> | about clear)")
+COMMANDS = ("sync", "classify", "export", "digest", "task", "tasks", "done", "skill", "schedule",
+            "unschedule", "status", "list", "about")
 
 CHAT_CLASSIFY_DEFAULT = 20
 CHAT_CLASSIFY_MAX = 100  # a chat command blocks its turn; bigger runs belong in the terminal
@@ -282,11 +292,58 @@ def do_about(ctx: Any, rest: list[str]) -> list[str]:
     return [f"Saved{note}. Sorting runs from now on use it."]
 
 
-def _llm_of(ctx: Any) -> Any:
+def llm_of(ctx: Any) -> Any:
     try:
         return getattr(ctx, "llm", None) if ctx is not None else None
     except Exception:  # noqa: BLE001 - outside Hermes the property may fail to import
         return None
+
+
+def dispatch_of(ctx: Any) -> Callable[..., Any] | None:
+    fn = getattr(ctx, "dispatch_tool", None) if ctx is not None else None
+    return fn if callable(fn) else None
+
+
+def do_digest(store: Store, cfg: dict[str, Any], ctx: Any, rest: list[str], *,
+              log: Callable[[str], None] | None = None) -> list[str]:
+    from . import digest
+
+    if store.count() == 0:
+        return ["No bookmarks stored yet. Run /xbm sync first."]
+    days = int(rest[0]) if rest and rest[0].isdigit() else digest.DAYS
+    res = digest.build(store, llm_of(ctx), days=max(1, min(days, 90)),
+                       language=str(cfg.get("classify_language") or "English"),
+                       about_me=str(cfg.get("about_me") or ""), log=log)
+    return [res.text]
+
+
+def do_action(store: Store, cfg: dict[str, Any], ctx: Any, cmd: str,
+              rest: list[str]) -> list[str]:
+    from . import actions, automation
+
+    try:
+        if cmd == "tasks":
+            return [actions.list_tasks(store)]
+        if cmd == "task":
+            if not rest:
+                return [actions.list_tasks(store)]
+            return [actions.add_task(store, rest[0], " ".join(rest[1:]))]
+        if cmd == "done":
+            return [actions.finish_task(store, rest[0] if rest else "")]
+        if cmd == "skill":
+            ref = rest[0] if rest else ""
+            if len(rest) > 1 and rest[1].lower() in ("save", "create", "yes"):
+                return [actions.save_skill(store, dispatch_of(ctx), ref)]
+            return [actions.draft_skill(store, llm_of(ctx), ref,
+                                        language=str(cfg.get("classify_language") or "English"))]
+        if cmd == "schedule":
+            return automation.schedule(store, dispatch_of(ctx), rest)
+        return automation.unschedule(store, dispatch_of(ctx))
+    except actions.ActionError as exc:
+        return [str(exc)]
+
+
+_llm_of = llm_of
 
 
 def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = None,
@@ -295,7 +352,7 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
         classify_cap: int | None = CHAT_CLASSIFY_MAX) -> list[str]:
     """Run one subcommand given as words (``["sync", "full"]``, ``["list", "5", "ai"]``)."""
     cmd = words[0].lower() if words else ""
-    if cmd not in ("sync", "classify", "export", "status", "list", "about"):
+    if cmd not in COMMANDS:
         return [USAGE]
     if cmd == "about":
         return do_about(ctx, words[1:])
@@ -312,6 +369,10 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
         cfg = config_of(ctx, overrides)
         if cmd == "export":
             return do_export(store, cfg, rest, ctx=ctx, log=log)
+        if cmd == "digest":
+            return do_digest(store, cfg, ctx, rest, log=log)
+        if cmd in ("task", "tasks", "done", "skill", "schedule", "unschedule"):
+            return do_action(store, cfg, ctx, cmd, rest)
         if cmd == "classify":
             limit: int | None = CHAT_CLASSIFY_DEFAULT
             if rest and rest[0].isdigit():

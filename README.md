@@ -8,6 +8,8 @@ exports them: a board on your Desktop, notes in Obsidian, a Notion database or a
 /xbm sync       pull your bookmarks from X (the first run reads all of them)
 /xbm classify   sort them: category, tags, kind, one-line summary, priority
 /xbm export     write them out: desktop, obsidian, notion, gdocs (or all)
+/xbm digest     the week in your bookmarks: the best ones numbered, 3 post ideas
+/xbm schedule   get that digest every Sunday in this chat; reply "task 3" or "skill 2"
 ```
 
 Works in any Hermes chat (`/xbm ...`) and in the terminal (`hermes xbm ...`).
@@ -39,8 +41,19 @@ Uses the official X API only: no scraping, no browser automation, read-only acce
 - **Google Docs.** One document "X Bookmarks", grouped by category, highest priority first, with
   links. Each export rewrites the same document, so its link and sharing stay.
 
-Coming next: a weekly digest through Hermes cron, and turning a bookmark into a task, note or
-Hermes skill. See [docs/PLAN.md](docs/PLAN.md).
+- **Digest.** `/xbm digest` covers the bookmarks stored in the last 7 days: counts per category,
+  a 2-3 sentence overview, the 10 best ones numbered (highest priority first, your own posts left
+  out) and 3 ideas for your own posts. The overview and ideas come from your model, in your
+  summary language; without a model you still get the numbered list.
+- **Weekly, in your chat.** `/xbm schedule` creates an ordinary Hermes cron job (default: every
+  Sunday 6pm, `/xbm schedule every monday 9am` to change it). Each week it syncs, writes the
+  digest and posts it to the chat you set it up from, or stays quiet when nothing is new. It is
+  also in Hermes' blueprint gallery as "X bookmarks weekly digest". `/xbm unschedule` removes it.
+- **Act on an item.** Reply to the digest with "task 3", or use `/xbm task 3 [note]`: the
+  bookmark becomes a task (`/xbm tasks`, `/xbm done 1`). "skill 2" or `/xbm skill 2` drafts a
+  Hermes skill from that post (steps, pitfalls, how to check) and shows it; `/xbm skill 2 save`
+  creates it through Hermes' own `skill_manage`, where Hermes may ask you to approve it. Posts
+  with no repeatable procedure get no skill. Your notes stay in the exports above.
 
 ## Setup
 
@@ -170,6 +183,15 @@ better priorities and fewer odd categories.
 | `/xbm status` | `hermes xbm status` | Counts, categories, last runs, X API and model use |
 | `/xbm list [N] [category]` | `hermes xbm list [--limit N] [--category C]` | Most recent bookmarks with their labels |
 | `/xbm about [text\|clear]` | `hermes xbm about [text]` | Show or set what you build and follow |
+| `/xbm digest [days]` | `hermes xbm digest [days]` | Digest of the last 7 (or N) days, items numbered |
+| `/xbm task N [note]` | `hermes xbm task N [note]` | Make item N of the latest digest a task (also a post id or x.com link) |
+| `/xbm tasks`, `/xbm done N` | `hermes xbm tasks`, `hermes xbm done N` | Open tasks; finish task N |
+| `/xbm skill N [save]` | `hermes xbm skill N [save]` | Draft a Hermes skill from item N; `save` creates it |
+| `/xbm schedule [when]` | | Weekly digest as a Hermes cron job in this chat (default `every sunday 6pm`) |
+| `/xbm unschedule` | `hermes xbm unschedule` | Remove that cron job |
+
+In a chat you can also just answer a digest: "task 3", "skill 2", "what are my tasks?". The
+agent has three tools for it: `xbm_digest`, `xbm_task` and `xbm_skill` (toolset `x_bookmarks`).
 
 ## Cost
 
@@ -180,7 +202,9 @@ better priorities and fewer odd categories.
   1,880 bookmarks that is about 3,650 more objects, so a full sync costs roughly 3x.
   `/xbm status` shows an estimate per run.
 - **Model** (your provider). Sorting 1,880 bookmarks took 188 calls, about 500k input and 200k
-  output tokens. On a free model that was $0.
+  output tokens. On a free model that was $0. A digest is one model call (up to 60 one-line
+  summaries in), a skill draft one call; both use the `xbm_digest` model slot. The weekly cron
+  job itself runs on your main model, which mostly just passes the digest on.
 
 ## Privacy, network and files
 
@@ -191,8 +215,12 @@ What the plugin touches, so you know before installing:
   only if you list it in `mcp_allowlist`; it creates the database, its two boards and the pages,
   and updates those pages) or `api.notion.com` with your token, and `docs.googleapis.com` through
   Hermes' Google sign-in. Nothing else, no telemetry.
-- **Data.** Bookmarks, labels, run history and export ids live in Hermes plugin data (SQLite) on
-  your machine. No keys or tokens are stored there.
+- **Data.** Bookmarks, labels, run history, export ids, digests, tasks and skill drafts live in
+  Hermes plugin data (SQLite) on your machine. No keys or tokens are stored there.
+- **Hermes objects it creates, only when you ask.** `/xbm schedule` creates one Hermes cron job
+  (it keeps running if you disable the plugin; `/xbm unschedule` or Hermes' cron tools remove
+  it). `/xbm skill N save` creates one Hermes skill through `skill_manage`. Both are ordinary
+  Hermes objects you can edit or delete.
 - **Credentials.** The X keys and the optional Notion token are read from the Hermes `.env`
   through Hermes' secret scope; the Notion connector, X OAuth 2.0 and Google sign-ins are kept
   and refreshed by Hermes.
