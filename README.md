@@ -92,16 +92,35 @@ hermes xbm export
 Obsidian's own `obsidian.json`. Otherwise set `obsidian_vault` to the vault folder. Then
 `hermes xbm export obsidian`.
 
-**Notion.**
+**Notion** goes through Hermes' own Notion connector: no token, no Notion app of your own.
 
-1. Open [notion.so/profile/integrations](https://www.notion.so/profile/integrations) and create an
-   **internal** connection for your workspace with Read, Update and Insert content. Copy its token.
-2. Put it in the Hermes `.env`: `XBM_NOTION_TOKEN=...`
-3. Make (or pick) a page for the database. On that page: **••• → Connections → add your
-   connection**.
-4. `hermes xbm export notion <that page's URL>` (the URL is remembered as `notion_page`).
-   The first export of 1,880 bookmarks takes about 13 minutes (Notion allows ~3 requests a
-   second); in chat it writes 100 per run, the terminal writes all.
+1. Connect Hermes to Notion once (opens the browser to sign in):
+
+   ```bash
+   hermes mcp install notion
+   ```
+
+2. Let this plugin use that connection. In your Hermes `config.yaml` (`~/.hermes/config.yaml`;
+   on Windows `%LOCALAPPDATA%\hermes\config.yaml`) add:
+
+   ```yaml
+   plugins:
+     entries:
+       hermes-x-bookmarks:
+         mcp_allowlist: ["notion"]
+   ```
+
+   Hermes gives a plugin no MCP access unless you list the server here.
+3. Make (or pick) a Notion page for the database, then in a Hermes chat:
+   `/xbm export notion <that page's URL>` (the URL is remembered as `notion_page`).
+   Each chat export writes up to 300 pages, 25 per request; run it again for the rest.
+
+Without the connector (an older Hermes, or a terminal where it is not connected), the plugin can
+use a Notion connection token instead: create an **internal** connection at
+[notion.so/profile/integrations](https://www.notion.so/profile/integrations) with Read, Update and
+Insert content, put its token in the Hermes `.env` as `XBM_NOTION_TOKEN=...`, add the connection
+to the page (**••• → Connections**), and run `hermes xbm export notion <page URL>`. Both routes
+write the same database and know which pages already exist.
 
 **Google Docs.**
 
@@ -133,7 +152,7 @@ Set in the Hermes Plugins settings, or with `/xbm about` for the last one.
 | `export_to` | desktop | What a plain `export` writes: desktop, obsidian, notion, gdocs |
 | `export_dir` | `X Bookmarks` on your Desktop | Where `export desktop` writes |
 | `obsidian_vault` | the vault Obsidian has open | Vault folder; notes go to `X Bookmarks/` in it |
-| `notion_page` | empty | The Notion page that holds the database (shared with your connection) |
+| `notion_page` | empty | The Notion page that holds the database |
 | `auth_backend` | auto | `keys` (above), `hermes` (OAuth 2.0 via `hermes auth add hermes-x-bookmarks:x`) or `xurl` |
 
 Sorting runs on the plugin's own model slot, **X bookmarks: sorting**. It uses your main model
@@ -167,12 +186,15 @@ better priorities and fewer odd categories.
 What the plugin touches, so you know before installing:
 
 - **Network.** `api.x.com` (your bookmarks, read-only) and your Hermes model provider (sorting).
-  Only when you export there: `api.notion.com`, and `docs.googleapis.com` through Hermes' Google
-  sign-in. Nothing else, no telemetry.
+  Only when you export there: Notion through Hermes' Notion connector (the `notion` MCP server,
+  only if you list it in `mcp_allowlist`; it creates the database, its two boards and the pages,
+  and updates those pages) or `api.notion.com` with your token, and `docs.googleapis.com` through
+  Hermes' Google sign-in. Nothing else, no telemetry.
 - **Data.** Bookmarks, labels, run history and export ids live in Hermes plugin data (SQLite) on
   your machine. No keys or tokens are stored there.
-- **Credentials.** The X keys and the Notion token are read from the Hermes `.env` through
-  Hermes' secret scope; the X OAuth 2.0 and Google sign-ins are kept and refreshed by Hermes.
+- **Credentials.** The X keys and the optional Notion token are read from the Hermes `.env`
+  through Hermes' secret scope; the Notion connector, X OAuth 2.0 and Google sign-ins are kept
+  and refreshed by Hermes.
   The plugin never writes a credential.
 - **Files outside plugin data.** `export desktop` writes `X Bookmarks/` on your Desktop (or
   `export_dir`); `export obsidian` writes notes into your vault's `X Bookmarks/` folder and reads

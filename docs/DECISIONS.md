@@ -10,9 +10,11 @@ hold back the catalog submission (owner, 2026-11-09).
 
 **D2. X sign-in route: settled 2026-11-08** (see "Made" below).
 
-**D3. Notion route: settled 2026-11-09.** Connection token `XBM_NOTION_TOKEN` read through the
-secret scope, plain httpx to `api.notion.com` (see "Made" below). The Notion MCP route stays an
-idea for later.
+**D3. Notion route: changed 2026-11-09 (0.2.1).** Default is Hermes' own Notion connector: the
+`notion` MCP server from `hermes mcp install notion`, called through `ctx.call_mcp` once the
+user lists it in `plugins.entries.hermes-x-bookmarks.mcp_allowlist` (owner: use Hermes' own
+connectors where they exist). The connection token `XBM_NOTION_TOKEN` (plain httpx to `api.notion.com`) stays
+as the fallback (see "Made" below).
 
 **D4. Product name.** Working name hermes-x-bookmarks / `/xbm`.
 
@@ -54,9 +56,18 @@ idea for later.
   the planned Drive HTML upload (2026-11-09): Hermes' `credentialed_provider_request` sends JSON
   bodies only, so a multipart upload is impossible without holding the token ourselves (rule 11).
   The same document is rewritten in place (delete range + insert), so its link stays.
-- Notion talks to `api.notion.com` with the user's connection token from the secret scope
-  (`XBM_NOTION_TOKEN`); no Notion OAuth. Export state (item -> page id, content hash) lives in
-  the plugin database, so unchanged pages cost no request.
+- Notion, connector route (0.2.1): `notion-create-database` (SQL DDL schema), two
+  `notion-create-view` boards, `notion-create-pages` 25 at a time (SQLite-form properties,
+  Notion-flavored Markdown body with every Markdown character escaped), `notion-update-page`
+  `update_properties` for changes. Hermes owns the Notion OAuth; the plugin holds nothing. Not
+  run live yet: whether `hermes xbm ...` in a terminal reaches the connector (chat does), and the
+  exact shape of the create-pages answer (page ids are read from `pages[].id`, else from the
+  ids in the text; without them a page is created once and never updated).
+- Notion, token route: `api.notion.com` with the user's connection token from the secret scope
+  (`XBM_NOTION_TOKEN`). Export state (item -> page id, content hash) lives in the plugin
+  database and is shared by both routes, so unchanged pages cost no request.
+- Google stays on the plugin's own `google` OAuth entry: Hermes has no Google Docs connector
+  (its hosted connectors are Nous Portal features with no plugin API).
 - Obsidian notes are found again by `tweet_id` front matter, not by file name; only the
   plugin's keys are rewritten.
 - No tokens in plugin data (catalog rule 11). Hermes or xurl hold them.

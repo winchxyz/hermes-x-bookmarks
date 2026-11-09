@@ -1,6 +1,6 @@
 manifest_version: 2
 name: hermes-x-bookmarks
-version: "0.2.0"
+version: "0.2.1"
 description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and exports them to a Desktop board, Obsidian, Notion or Google Docs."
 author: winchxyz
 kind: standalone
@@ -29,9 +29,10 @@ optional_env:
   - name: XBM_X_CLIENT_ID
     description: "OAuth 2.0 Client ID of your own X developer app (Native App, read-only). Sign in with `hermes auth add hermes-x-bookmarks:x`."
     url: "https://console.x.com"
-  # Notion export: token of your own Notion connection (internal integration or personal access token).
+  # Notion export fallback: the default route is Hermes' Notion connector (hermes mcp install notion
+  # + mcp_allowlist: ["notion"]). This token is only for when that connector is not available.
   - name: XBM_NOTION_TOKEN
-    description: "Notion connection token for /xbm export notion. Share one page with the connection."
+    description: "Optional. Notion connection token, used only when Hermes' Notion connector is not available. Add the connection to the page."
     url: "https://www.notion.so/profile/integrations"
     secret: true
   # Google Docs export: your own Google Cloud OAuth client (type Desktop app), scope drive.file only.
@@ -107,4 +108,4 @@ config_schema:
     type: str
     default: ""
     label: "Notion page"
-    description: "URL of the Notion page that holds the X Bookmarks database. Share it with your Notion connection first."
+    description: "URL of the Notion page that holds the X Bookmarks database. /xbm export notion <page URL> sets it."

@@ -29,6 +29,7 @@ USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export [where] | status"
 CHAT_CLASSIFY_DEFAULT = 20
 CHAT_CLASSIFY_MAX = 100  # a chat command blocks its turn; bigger runs belong in the terminal
 CHAT_NOTION_MAX = 100    # Notion pages per chat export (about 40 s); the terminal has no cap
+CONNECTOR_FACTOR = 3     # the Notion connector writes 25 pages per call: 300 per chat export
 TARGETS = ("desktop", "obsidian", "notion", "gdocs")
 TARGET_ALIASES = {"local": "desktop", "md": "desktop", "html": "desktop", "board": "desktop",
                   "google": "gdocs", "docs": "gdocs", "gdoc": "gdocs", "googledocs": "gdocs",
@@ -189,6 +190,35 @@ def parse_targets(words: list[str], default: str = "") -> tuple[list[str], str, 
     return targets or ([] if unknown else ["desktop"]), page, unknown
 
 
+def export_notion(store: Store, ctx: Any, parent: str, categories: list[str], *,
+                  limit: int | None, log: Callable[[str], None] | None = None) -> Any:
+    """Hermes' Notion connector first; the XBM_NOTION_TOKEN route when it is not available."""
+    from . import notion, notion_mcp, secrets
+
+    call_mcp = getattr(ctx, "call_mcp", None) if ctx is not None else None
+    token = secrets.get(notion.TOKEN_ENV)
+    if callable(call_mcp):
+        res = notion_mcp.export(store, parent=parent, categories=categories, call_mcp=call_mcp,
+                                limit=None if limit is None else limit * CONNECTOR_FACTOR,
+                                log=log)
+        if not (res.unavailable and token):
+            return res
+        note = "The Notion connector is not available here, so XBM_NOTION_TOKEN was used."
+    elif token:
+        note = ""
+    else:
+        res = notion.NotionResult()
+        res.errors.append(notion_mcp.setup_hint())
+        res.errors.append(f"Or put a Notion connection token in the Hermes .env as "
+                          f"{notion.TOKEN_ENV}.")
+        return res
+    res = notion.export(store, parent=parent, categories=categories, token=token, limit=limit,
+                        log=log)
+    if note:
+        res.notes.insert(0, note)
+    return res
+
+
 def do_export(store: Store, cfg: dict[str, Any], words: list[str] | None = None, *,
               ctx: Any = None, notion_limit: int | None = CHAT_NOTION_MAX,
               log: Callable[[str], None] | None = None) -> list[str]:
@@ -213,16 +243,13 @@ def do_export(store: Store, cfg: dict[str, Any], words: list[str] | None = None,
 
                 lines += obsidian.export(store, vault=str(cfg.get("obsidian_vault") or "")).lines()
             elif target == "notion":
-                from . import notion, secrets
-
                 if page:
                     setter = getattr(ctx, "set_config", None) if ctx is not None else None
                     if setter:
                         setter("notion_page", page)
-                lines += notion.export(
-                    store, parent=page or str(cfg.get("notion_page") or ""),
-                    categories=categories_from(cfg.get("categories")),
-                    token=secrets.get(notion.TOKEN_ENV), limit=notion_limit, log=log).lines()
+                lines += export_notion(store, ctx, page or str(cfg.get("notion_page") or ""),
+                                       categories_from(cfg.get("categories")),
+                                       limit=notion_limit, log=log).lines()
             elif target == "gdocs":
                 from . import gdocs
 

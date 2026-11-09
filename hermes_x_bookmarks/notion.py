@@ -58,6 +58,7 @@ class NotionResult:
     skipped_deleted: int = 0
     left: int = 0
     new_database: bool = False
+    unavailable: bool = False   # the connector route could not run at all
     notes: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
 
@@ -69,8 +70,7 @@ class NotionResult:
         if self.url:
             out.append(f"  Database: {self.url}")
         if self.left:
-            out.append(f"  {self.left} more to go: run the export again (or `hermes xbm export "
-                       "notion` in a terminal for all at once).")
+            out.append(f"  {self.left} more to go: run the export again.")
         out += [f"  {n}" for n in self.notes]
         out += [f"  {e}" for e in self.errors[:5]]
         return out

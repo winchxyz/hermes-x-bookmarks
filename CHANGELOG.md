@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1 (2026-11-09)
+
+Notion through Hermes' own Notion connector.
+
+- `export notion` now uses the Notion MCP server Hermes connects with `hermes mcp install
+  notion` (`ctx.call_mcp`), once you list it in the plugin's `mcp_allowlist`. No token, no
+  Notion app of your own. Pages go 25 per request; a chat export writes up to 300.
+- `XBM_NOTION_TOKEN` stays as the fallback when the connector is not available; both routes
+  share the database and the export state.
+
 ## 0.2.0 (2026-11-09)
 
 Exports to Obsidian, Notion and Google Docs.
