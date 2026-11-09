@@ -39,6 +39,10 @@ def register(ctx: Any) -> None:
         description=("hermes xbm whoami | probe | sync | classify | export | digest | task | tasks"
                      " | done | skill | schedule | unschedule | status | list | about"))
     tools.register(ctx)
+    from . import hooks
+
+    # A slash command's output never reaches the agent: this lets a bare "task 3" find the digest.
+    ctx.register_hook("pre_llm_call", hooks.make_pre_llm_call())
     blueprint = getattr(ctx, "register_automation_blueprint", None)
     if blueprint is not None:
         spec = dict(automation.BLUEPRINT)

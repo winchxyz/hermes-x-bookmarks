@@ -17,6 +17,10 @@ Digest and actions.
   Also an Automation Blueprint, "X bookmarks weekly digest".
 - Agent tools `xbm_digest`, `xbm_task`, `xbm_skill` (toolset `x_bookmarks`) and a second model
   slot, "X bookmarks: digest and skills" (`xbm_digest`).
+- A bare reply "task 3", "skill 2" or "done 1" works in any chat: Hermes does not show slash
+  command output to the agent, so a `pre_llm_call` hook adds a one-line note naming the digest
+  item and the tool to call (only for such messages, only with a digest from the last 8 days).
+  Found live: without it the agent searched the disk for "task 3".
 - Plugin data schema 4: digests, tasks and skill drafts.
 
 ## 0.2.3 (2026-11-09)

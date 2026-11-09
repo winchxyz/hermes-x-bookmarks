@@ -82,6 +82,12 @@ as the fallback (see "Made" below).
 - Digest window = bookmarks first stored in the last N days (X does not say when you
   bookmarked a post). Digest numbers refer to the latest digest; `/xbm tasks` has its own
   numbers for `done`.
+- Bare digest replies (live, 2026-11-09): Hermes keeps slash command output out of the agent's
+  conversation, so after `/xbm digest` a reply "task 3" reached an agent with no context, which
+  searched the disk. Fix: a `pre_llm_call` hook that, only for a message that is just
+  "task|skill|done N" and only with a digest from the last 8 days, adds a note naming the item
+  and the tool. Chosen over `pre_gateway_dispatch` rewriting (gateway only, and it would take
+  "task 3" away from the agent even when the user means something else).
 - Skills are drafted by the plugin (model call with a fixed schema, post text as data) and
   created only on `save`, through Hermes' `skill_manage`, so Hermes' approval gate and skill
   ledger apply. No "note" action: the exports are the notes.

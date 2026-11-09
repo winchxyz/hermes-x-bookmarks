@@ -192,8 +192,11 @@ better priorities and fewer odd categories.
 | `/xbm schedule [when]` | | Weekly digest as a Hermes cron job in this chat (default `every sunday 6pm`) |
 | `/xbm unschedule` | `hermes xbm unschedule` | Remove that cron job |
 
-In a chat you can also just answer a digest: "task 3", "skill 2", "what are my tasks?". The
-agent has three tools for it: `xbm_digest`, `xbm_task` and `xbm_skill` (toolset `x_bookmarks`).
+In a chat you can also just answer a digest: "task 3", "skill 2", "done 1". The agent has
+three tools for it: `xbm_digest`, `xbm_task` and `xbm_skill` (toolset `x_bookmarks`). Hermes
+does not show a slash command's output to the agent, so when your whole message is such a reply
+and you had a digest in the last 8 days, the plugin's `pre_llm_call` hook adds one line to that
+message naming the item and the tool. Any other message is left alone.
 
 ## Cost
 
@@ -230,6 +233,8 @@ What the plugin touches, so you know before installing:
 - **Files outside plugin data.** `export desktop` writes `X Bookmarks/` on your Desktop (or
   `export_dir`); `export obsidian` writes notes into your vault's `X Bookmarks/` folder and reads
   Obsidian's `obsidian.json` to find the vault (vault paths only).
+- **Hook.** `pre_llm_call` reads your message only to check whether it is just "task N",
+  "skill N" or "done N"; only then it opens plugin data and adds a short note (see Commands).
 - **Commands.** None, unless you choose the `xurl` sign-in, which runs `xurl token`.
 - Post text goes to the model you configured in Hermes and to the destinations you export to.
 

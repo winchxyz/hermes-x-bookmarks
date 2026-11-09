@@ -247,6 +247,50 @@ def test_digest_tool_syncs_first_and_survives_a_sign_in_failure(tmp_path):
     assert out["success"] and "no keys" in out["sync"][0] and out["new"] == 3
 
 
+def test_bare_reply_gets_a_note_naming_the_item_and_tool(tmp_path):
+    from hermes_x_bookmarks import hooks
+
+    db = file_db(tmp_path)
+    hook = hooks.make_pre_llm_call(db)
+    assert hook(user_message="task 3") is None              # no digest yet: nothing added
+    conn = db()
+    digest.build(Store(conn), None)
+    conn.close()
+    note = hook(user_message="task 3")["context"]
+    assert "item #3" in note and "unsorted one" in note and "xbm_task" in note
+    assert '"add"' in note and "ignore this note" in note
+    note = hook(user_message=[{"type": "text", "text": "Skill #2"}])["context"]
+    assert "xbm_skill" in note and "Big [guide]" in note and "ask before saving" in note
+    assert "as note" in hook(user_message="task 1 read on the train")["context"]
+    for other in ("task 11", "what is task 3 in my unity spike?", "task", "hello",
+                  "task 3 " + "x" * 400, None):
+        assert hook(user_message=other) is None, other
+    assert hook(user_message="done 1") is None                # no open tasks yet
+    conn = db()
+    Store(conn).add_task("2")
+    conn.close()
+    assert "xbm_task" in hook(user_message="done 1")["context"]
+
+
+def test_old_digest_is_not_used():
+    from hermes_x_bookmarks import hooks
+
+    store = filled_store()
+    digest.build(store, None)
+    later = dt.datetime.now(dt.UTC) + dt.timedelta(days=9)
+    assert hooks.note_for(store, "task 1", now=later) == ""
+    assert hooks.note_for(store, "task 1") != ""
+
+
+def test_hook_never_breaks_a_turn():
+    from hermes_x_bookmarks import hooks
+
+    def broken():
+        raise OSError("disk gone")
+
+    assert hooks.make_pre_llm_call(broken)(user_message="task 3") is None
+
+
 class BlueprintCtx(FakeCtx):
     def __init__(self):
         super().__init__()

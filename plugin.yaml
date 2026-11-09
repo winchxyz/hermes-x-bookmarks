@@ -9,7 +9,7 @@ homepage: https://github.com/winchxyz/hermes-x-bookmarks
 requires_hermes: ">=0.23.0"
 tags: [x, twitter, bookmarks, notion, obsidian, google-docs, productivity]
 provides_tools: [xbm_digest, xbm_task, xbm_skill]
-provides_hooks: []
+provides_hooks: [pre_llm_call]
 optional_env:
   # X sign-in, option 1 (simplest): OAuth 1.0a keys of your own X app (Keys and tokens page).
   - name: XBM_X_API_KEY
