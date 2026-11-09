@@ -13,6 +13,10 @@ exports them: a board on your Desktop, notes in Obsidian, a Notion database or a
 Works in any Hermes chat (`/xbm ...`) and in the terminal (`hermes xbm ...`).
 Uses the official X API only: no scraping, no browser automation, read-only access.
 
+![The Desktop board (demo data)](docs/media/board.png)
+
+![Exports to Obsidian, Notion, Google Docs and the Desktop (demo data)](docs/media/exports.png)
+
 ## What it does
 
 - **Sync.** Reads every bookmark the X API returns, newest first. The full text of X Articles

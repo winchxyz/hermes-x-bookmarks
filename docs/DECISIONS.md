@@ -18,9 +18,9 @@ open for a catalog submission.
 
 **D2. X sign-in route: settled 2026-11-08** (see "Made" below).
 
-**D3. Notion route.** Internal integration token (simple, our code) vs the optional Notion MCP
-(`ctx.call_mcp`, no token in our plugin, but the user edits `mcp_allowlist`). Default: token;
-MCP as an option if its tool set covers database create + view + upsert.
+**D3. Notion route: settled 2026-11-09.** Connection token `XBM_NOTION_TOKEN` read through the
+secret scope, plain httpx to `api.notion.com` (see "Made" below). The Notion MCP route stays an
+idea for later.
 
 **D4. Product name.** Working name hermes-x-bookmarks / `/xbm`.
 
