@@ -9,6 +9,7 @@ Three ways a bookmark carries an Article:
 """
 from __future__ import annotations
 
+import html
 import re
 import unicodedata
 from collections.abc import Iterable, Mapping
@@ -86,7 +87,7 @@ def clean_text(text: str) -> str:
     Zero-width characters can trip Hermes' prompt-injection scanner; NFKC turns U+1D400-U+1D7FF
     styled letters and digits into ASCII and leaves other scripts alone.
     """
-    text = (text or "").translate(ZERO_WIDTH)
+    text = html.unescape(text or "").translate(ZERO_WIDTH)  # X sends &gt; &lt; &amp; in post text
     if any(0x1D400 <= ord(ch) <= 0x1D7FF for ch in text):
         text = "".join(unicodedata.normalize("NFKC", ch) if 0x1D400 <= ord(ch) <= 0x1D7FF else ch
                        for ch in text)

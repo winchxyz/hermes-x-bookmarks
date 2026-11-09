@@ -14,9 +14,11 @@ from .reader import Item
 from .store import Store, open_db
 from .xapi import XApi
 
-USAGE = ("Usage: /xbm sync [full] | classify [N|all] | status | list [N] [category] | about\n"
+USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export | status | list [N] [category]"
+         " | about\n"
          "  sync      pull new bookmarks from X (full: re-read all of them)\n"
          "  classify  sort unsorted bookmarks with your model (default 20 at a time)\n"
+         "  export    write bookmarks.md and board.html to 'X Bookmarks' on your Desktop\n"
          "  status    counts, categories, last runs, X API and model cost\n"
          "  list      the N most recent bookmarks (default 10), optionally of one category\n"
          "  about     what you build and follow, so sorting can judge priority "
@@ -30,7 +32,7 @@ TCO = re.compile(r"https?://t\.co/\S*")
 ApiFactory = Callable[[dict[str, Any]], XApi]
 DbFactory = Callable[[], sqlite3.Connection]
 CONFIG_KEYS = ("auth_backend", "xurl_app", "categories", "classify_language",
-               "about_me")
+               "about_me", "export_dir")
 
 
 def config_of(ctx: Any, overrides: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -152,6 +154,25 @@ def do_list(store: Store, n: int = 10, category: str = "") -> list[str]:
     return out
 
 
+def do_export(store: Store, cfg: dict[str, Any]) -> list[str]:
+    from . import export_local
+
+    if store.count() == 0:
+        return ["No bookmarks stored yet. Run /xbm sync first."]
+    try:
+        res = export_local.export(store, export_dir=str(cfg.get("export_dir") or "") or None)
+    except OSError as exc:
+        return [f"Export failed: {exc}"]
+    from .classify import SCHEMA_VERSION
+
+    lines = res.lines()
+    unsorted = store.count_unclassified(SCHEMA_VERSION)
+    if unsorted:
+        lines.append(f"{unsorted} bookmark(s) are not sorted yet (column 'Unsorted'); "
+                     "/xbm classify sorts them.")
+    return lines
+
+
 def do_about(ctx: Any, rest: list[str]) -> list[str]:
     from .classify import ABOUT_MAX
 
@@ -185,7 +206,7 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
         classify_cap: int | None = CHAT_CLASSIFY_MAX) -> list[str]:
     """Run one subcommand given as words (``["sync", "full"]``, ``["list", "5", "ai"]``)."""
     cmd = words[0].lower() if words else ""
-    if cmd not in ("sync", "classify", "status", "list", "about"):
+    if cmd not in ("sync", "classify", "export", "status", "list", "about"):
         return [USAGE]
     if cmd == "about":
         return do_about(ctx, words[1:])
@@ -200,6 +221,8 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
             cat = " ".join(rest[1:] if rest and rest[0].isdigit() else rest)
             return do_list(store, n, cat)
         cfg = config_of(ctx, overrides)
+        if cmd == "export":
+            return do_export(store, cfg)
         if cmd == "classify":
             limit: int | None = CHAT_CLASSIFY_DEFAULT
             if rest and rest[0].isdigit():

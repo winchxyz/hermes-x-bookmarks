@@ -27,9 +27,9 @@ def register(ctx: Any) -> None:
                      description="Sorts saved X bookmarks into categories (batches of 10)")
     ctx.register_command(
         "xbm", commands.make_slash_handler(ctx),
-        description="X bookmarks: sync, classify, status, list, about",
-        args_hint="sync [full] | classify [N] | status | list [N] [category] | about [text]")
+        description="X bookmarks: sync, classify, export, status, list, about",
+        args_hint="sync [full] | classify [N] | export | status | list [N] [category] | about")
     ctx.register_cli_command(
-        name="xbm", help="X bookmarks: sign-in check, sync, classify, status, list",
+        name="xbm", help="X bookmarks: sign-in check, sync, classify, export, status, list",
         setup_fn=cli.setup, handler_fn=cli.make_handler(ctx),
-        description="hermes xbm whoami | probe | sync | classify | status | list | about")
+        description="hermes xbm whoami | probe | sync | classify | export | status | list | about")

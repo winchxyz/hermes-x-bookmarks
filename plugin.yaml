@@ -65,3 +65,8 @@ config_schema:
     default: ""
     label: "About you"
     description: "A sentence or two on what you build and follow. Sorting uses it to judge priority. Set it with /xbm about <text>."
+  export_dir:
+    type: str
+    default: ""
+    label: "Export folder"
+    description: "Where /xbm export writes bookmarks.md and board.html. Empty: an 'X Bookmarks' folder on your Desktop."

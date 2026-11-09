@@ -17,11 +17,12 @@ COMMANDS = (
     ("probe", "Day-1 spike: ask X how bookmarks and Articles come back"),
     ("sync", "Pull new bookmarks from X into the local store"),
     ("classify", "Sort unsorted bookmarks with your Hermes model"),
+    ("export", "Write bookmarks.md and board.html to 'X Bookmarks' on your Desktop"),
     ("status", "How many bookmarks are stored, categories, last runs and their cost"),
     ("list", "Show the most recent stored bookmarks"),
     ("about", "Show or set what you build and follow (used to judge priority)"),
 )
-COMMANDS_RUN = ("sync", "classify", "status", "list", "about")
+COMMANDS_RUN = ("sync", "classify", "export", "status", "list", "about")
 NEEDS_X = ("whoami", "probe", "sync")
 
 
@@ -48,6 +49,10 @@ def setup(parser: argparse.ArgumentParser) -> None:
             p.add_argument("--limit", type=int, default=20,
                            help="Sort at most this many, most recent first (default 20)")
             p.add_argument("--all", action="store_true", help="Sort every unsorted bookmark")
+        if name == "export":
+            p.add_argument("--dir", default=None,
+                           help="Folder to write to (default: the export_dir setting, else "
+                                "'X Bookmarks' on your Desktop)")
         if name == "about":
             p.add_argument("text", nargs="*", help="New text, or 'clear'; empty shows it")
 
@@ -63,7 +68,8 @@ def say(line: str) -> None:
 
 def _overrides(args: argparse.Namespace) -> dict[str, Any]:
     return {"auth_backend": getattr(args, "backend", None),
-            "xurl_app": getattr(args, "xurl_app", None)}
+            "xurl_app": getattr(args, "xurl_app", None),
+            "export_dir": getattr(args, "dir", None)}
 
 
 def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None = None,
@@ -94,7 +100,7 @@ def make_handler(ctx: Any = None, *, api_factory: Callable[[dict], XApi] | None 
             for line in lines:
                 say(line)
             failed = lines and lines[0].startswith(
-                ("Sync failed", "X sign-in unavailable", "No model access"))
+                ("Sync failed", "X sign-in unavailable", "No model access", "Export failed"))
             return 1 if failed else 0
         api = build(commands.config_of(ctx, _overrides(args)))
         try:

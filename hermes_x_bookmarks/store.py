@@ -213,6 +213,22 @@ class Store:
         d["tags"] = json.loads(d["tags"] or "[]")
         return d
 
+    def labelled_items(self) -> list[tuple[Item, dict[str, Any] | None]]:
+        """Every stored bookmark with its label (or None), most recent bookmark first."""
+        rows = self.conn.execute(
+            "SELECT i.data, c.category, c.suggested_category, c.tags, c.kind, c.summary, "
+            "c.priority, c.why_saved FROM items i LEFT JOIN classes c ON c.item_id = i.id "
+            "WHERE i.removed_at IS NULL ORDER BY i.seq DESC")
+        out: list[tuple[Item, dict[str, Any] | None]] = []
+        for r in rows:
+            label = None
+            if r["category"] is not None:
+                label = {k: r[k] for k in ("category", "suggested_category", "kind", "summary",
+                                           "priority", "why_saved")}
+                label["tags"] = json.loads(r["tags"] or "[]")
+            out.append((Item.from_dict(json.loads(r["data"])), label))
+        return out
+
     def category_counts(self) -> list[tuple[str, int]]:
         rows = self.conn.execute(
             "SELECT c.category, COUNT(*) AS n FROM classes c JOIN items i ON i.id = c.item_id "
