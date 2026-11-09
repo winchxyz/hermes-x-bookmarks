@@ -246,3 +246,37 @@ def test_export_command_without_connector_or_token(monkeypatch):
     text = "\n".join(commands.do_export(filled_store(), {"notion_page": PAGE}, ["notion"],
                                         ctx=Ctx()))
     assert "hermes mcp install notion" in text and "XBM_NOTION_TOKEN" in text
+
+
+class Posted:
+    def __init__(self, sink):
+        self.ok, self.sink = True, sink
+
+    def edit(self, text):
+        self.sink.append(("edit", text))
+
+
+def test_chat_progress_posts_once_then_edits():
+    sink: list = []
+
+    class C:
+        def post_message(self, text):
+            sink.append(("post", text))
+            return Posted(sink)
+
+    log = commands.chat_progress(C())
+    log("Notion: 25 of 60 page(s) written...")
+    log("Notion: 50 of 60 page(s) written...")
+    assert sink == [("post", "Notion: 25 of 60 page(s) written..."),
+                    ("edit", "Notion: 50 of 60 page(s) written...")]
+    assert commands.chat_progress(object()) is None
+
+
+def test_chat_export_has_no_page_cap(monkeypatch):
+    store = filled_store()
+    fake = FakeMcp()
+    monkeypatch.setattr(notion_mcp, "BATCH", 1)  # 3 bookmarks -> 3 calls, nothing left over
+    lines = commands.do_export(store, {"notion_page": PAGE}, ["notion"], ctx=Ctx(fake))
+    text = "\n".join(lines)
+    assert "Notion: 3 new page(s)" in text and "more to go" not in text
+    assert fake.tools().count("notion-create-pages") == 3

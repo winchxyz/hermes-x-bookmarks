@@ -113,7 +113,8 @@ Obsidian's own `obsidian.json`. Otherwise set `obsidian_vault` to the vault fold
    Hermes gives a plugin no MCP access unless you list the server here.
 3. Make (or pick) a Notion page for the database, then in a Hermes chat:
    `/xbm export notion <that page's URL>` (the URL is remembered as `notion_page`).
-   Each chat export writes up to 300 pages, 25 per request; run it again for the rest.
+   One export writes everything (25 pages per request; about 1,900 bookmarks take a few
+   minutes) and shows its progress in the chat. Running it again sends only what changed.
 
 Without the connector (an older Hermes, or a terminal where it is not connected), the plugin can
 use a Notion connection token instead: create an **internal** connection at

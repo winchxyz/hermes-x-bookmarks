@@ -427,7 +427,7 @@ def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMc
             res.created += 1
         batch.clear()
         if log:
-            log(f"Notion: {res.created + res.updated} page(s) written...")
+            log(f"Notion: {res.created + res.updated} of {len(todo)} page(s) written...")
 
     todo: list[tuple[Item, dict[str, Any], str, tuple[str, str] | None]] = []
     for item, c in rows:

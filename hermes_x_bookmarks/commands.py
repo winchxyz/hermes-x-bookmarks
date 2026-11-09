@@ -28,8 +28,6 @@ USAGE = ("Usage: /xbm sync [full] | classify [N|all] | export [where] | status"
 
 CHAT_CLASSIFY_DEFAULT = 20
 CHAT_CLASSIFY_MAX = 100  # a chat command blocks its turn; bigger runs belong in the terminal
-CHAT_NOTION_MAX = 100    # Notion pages per chat export (about 40 s); the terminal has no cap
-CONNECTOR_FACTOR = 3     # the Notion connector writes 25 pages per call: 300 per chat export
 TARGETS = ("desktop", "obsidian", "notion", "gdocs")
 TARGET_ALIASES = {"local": "desktop", "md": "desktop", "html": "desktop", "board": "desktop",
                   "google": "gdocs", "docs": "gdocs", "gdoc": "gdocs", "googledocs": "gdocs",
@@ -199,7 +197,7 @@ def export_notion(store: Store, ctx: Any, parent: str, categories: list[str], *,
     token = secrets.get(notion.TOKEN_ENV)
     if callable(call_mcp):
         res = notion_mcp.export(store, parent=parent, categories=categories, call_mcp=call_mcp,
-                                limit=None if limit is None else limit * CONNECTOR_FACTOR,
+                                limit=limit,
                                 log=log)
         if not (res.unavailable and token):
             return res
@@ -220,7 +218,7 @@ def export_notion(store: Store, ctx: Any, parent: str, categories: list[str], *,
 
 
 def do_export(store: Store, cfg: dict[str, Any], words: list[str] | None = None, *,
-              ctx: Any = None, notion_limit: int | None = CHAT_NOTION_MAX,
+              ctx: Any = None, notion_limit: int | None = None,
               log: Callable[[str], None] | None = None) -> list[str]:
     from .classify import SCHEMA_VERSION, categories_from
 
@@ -313,8 +311,7 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
             return do_list(store, n, cat)
         cfg = config_of(ctx, overrides)
         if cmd == "export":
-            return do_export(store, cfg, rest, ctx=ctx, log=log,
-                             notion_limit=CHAT_NOTION_MAX if classify_cap is not None else None)
+            return do_export(store, cfg, rest, ctx=ctx, log=log)
         if cmd == "classify":
             limit: int | None = CHAT_CLASSIFY_DEFAULT
             if rest and rest[0].isdigit():
@@ -333,10 +330,32 @@ def run(words: list[str], *, ctx: Any = None, api_factory: ApiFactory | None = N
         conn.close()
 
 
+def chat_progress(ctx: Any) -> Callable[[str], None] | None:
+    """One chat message that long commands keep editing ("Notion: 250 of 1171 ..."), or None.
+
+    ``ctx.post_message`` never raises; a failed post or edit just leaves the chat quiet.
+    """
+    post = getattr(ctx, "post_message", None) if ctx is not None else None
+    if not callable(post):
+        return None
+    handle: list[Any] = []
+
+    def log(line: str) -> None:
+        try:
+            if handle and getattr(handle[0], "ok", False):
+                handle[0].edit(line)
+            elif not handle:
+                handle.append(post(line))
+        except Exception:  # noqa: BLE001 - progress must never break the command
+            pass
+
+    return log
+
+
 def make_slash_handler(ctx: Any = None, *, api_factory: ApiFactory | None = None,
                        db_factory: DbFactory | None = None) -> Callable[..., str]:
     def handler(raw_args: str = "", **_session: Any) -> str:
         return "\n".join(run((raw_args or "").split(), ctx=ctx, api_factory=api_factory,
-                             db_factory=db_factory))
+                             db_factory=db_factory, log=chat_progress(ctx)))
 
     return handler

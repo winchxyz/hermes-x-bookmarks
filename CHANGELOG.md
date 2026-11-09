@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.3 (2026-11-09)
+
+- A chat export writes all bookmarks in one go (no 100/300 page cap: Hermes runs plugin
+  commands without a time limit) and keeps one progress message in the chat up to date.
+
 ## 0.2.2 (2026-11-09)
 
 Fixes from the first live run of the Notion connector.
