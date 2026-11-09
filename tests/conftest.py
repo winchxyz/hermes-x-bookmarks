@@ -17,6 +17,17 @@ for _p in (ROOT, ROOT / "tests"):
 
 from hermes_x_bookmarks.auth import HttpResult  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _no_real_user_folders(tmp_path_factory, monkeypatch):
+    """No test may write to the real Desktop or read the real Obsidian config."""
+    from hermes_x_bookmarks import export_local, obsidian
+
+    safe = tmp_path_factory.mktemp("user-folders")
+    monkeypatch.setattr(export_local, "desktop_dir", lambda: safe / "Desktop")
+    monkeypatch.setattr(obsidian, "obsidian_config_path", lambda platform=None: safe / "none.json")
+
+
 MARKER_TOKEN = "xbm-MARKER-access-token-DO-NOT-LEAK"
 
 

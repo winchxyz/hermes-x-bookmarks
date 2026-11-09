@@ -248,10 +248,15 @@ def test_parse_targets():
     assert pt(["dropbox"])[2] == ["dropbox"]
 
 
-def test_export_command_runs_each_target_and_keeps_going(tmp_path):
+def test_export_command_runs_each_target_and_keeps_going(tmp_path, monkeypatch):
+    from hermes_x_bookmarks import export_local
+
+    # never write to the real Desktop from a test
+    monkeypatch.setattr(export_local, "desktop_dir", lambda: tmp_path / "fake-desktop")
     store = filled_store()
     lines = commands.do_export(store, {"obsidian_vault": str(tmp_path / "nope")},
                                ["obsidian", "desktop"])
+    assert (tmp_path / "fake-desktop" / "X Bookmarks" / "board.html").exists()
     text = "\n".join(lines)
     assert "obsidian export failed" in text.lower() or "does not exist" in text
     lines = commands.do_export(store, {"obsidian_vault": str(tmp_path), "export_dir":
