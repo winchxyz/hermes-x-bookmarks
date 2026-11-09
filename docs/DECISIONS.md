@@ -2,19 +2,11 @@
 
 ## Open (need the owner)
 
-**D1. Who runs it: a personal tool or a product others install?**
-X prices "owned reads" ($0.001/post) only when the reader owns the developer app, and X's
-Developer Policy warns against tools that make every end user register their own app.
-- (a) Personal-first (recommended for now): the owner's own app, own bookmarks. The public repo is
-  "how I built my personal integration". Catalog submission waits until D1b is settled.
-- (b) One app that other users authorize with OAuth: compliant, but the owner pays standard rates
-  ($0.005/post + expansions) for everyone's reads.
-- D1b: ask X on devcommunity.x.com whether a Hermes plugin where each user brings their own app is
-  acceptable (owner posts; draft the question on day 1).
-
-2026-11-08, owner: option (b) is out. The owner does not pay for other users' reads; every user
-brings their own X app and keys and pays X for their own reads. The policy question of D1b stays
-open for a catalog submission.
+**D1. Who runs it: settled 2026-11-09.** Every user brings their own X developer app and keys
+and pays X for their own reads. The owner does not run a shared app and does not pay for anyone
+else's reads (option "one app for everyone" is out, 2026-11-08). Registering an app and paying for
+it is each user's own choice, so D1b (asking X about bring-your-own-app) is closed and does not
+hold back the catalog submission (owner, 2026-11-09).
 
 **D2. X sign-in route: settled 2026-11-08** (see "Made" below).
 
