@@ -47,6 +47,11 @@ MCP as an option if its tool set covers database create + view + upsert.
   codes, the owner's own posts are recognised, no repeated summaries. Weak spots of this small
   model: why_saved often parrots the about-me text, and about-me pulls some crypto posts into
   "AI & agents". A stronger model on the `xbm_classify` slot is the fix; owner review pending.
+- **Phase 3 re-sort with category boundaries (2026-11-09, live, label schema 3):** same free
+  model, 188 calls, 501k / 198k tokens, $0. why_saved parroting the about-me text 21% -> ~0%;
+  302 of 1,880 categories changed, mostly toward the right one (memecoin how-to and Solana jobs
+  -> crypto, AI mascot design -> design, Claude Code Security -> dev tools). Still weak:
+  priority is 75% p2, and a few odd cases remain (Telegram NFT guide in "AI & agents").
 - **Expansions (2026-11-08):** no `article.media_entities` by default (half of all billable
   expanded resources after 2026-11-22); incremental syncs use small pages and stop at known ids.
 
