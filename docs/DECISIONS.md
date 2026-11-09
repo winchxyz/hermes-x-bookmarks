@@ -59,10 +59,12 @@ as the fallback (see "Made" below).
 - Notion, connector route (0.2.1): `notion-create-database` (SQL DDL schema), two
   `notion-create-view` boards, `notion-create-pages` 25 at a time (SQLite-form properties,
   Notion-flavored Markdown body with every Markdown character escaped), `notion-update-page`
-  `update_properties` for changes. Hermes owns the Notion OAuth; the plugin holds nothing. Not
-  run live yet: whether `hermes xbm ...` in a terminal reaches the connector (chat does), and the
-  exact shape of the create-pages answer (page ids are read from `pages[].id`, else from the
-  ids in the text; without them a page is created once and never updated).
+  `update_properties` for changes. Hermes owns the Notion OAuth; the plugin holds nothing.
+  Live 2026-11-09 (0.2.2, chat through the gateway): database and boards created, 300 pages in
+  one chat export, all 300 page ids read back (distinct). The connector rejects select and
+  multi-select values that are not options yet; 0.2.2 learns the allowed values from that error.
+  Not checked: whether `hermes xbm ...` in a terminal reaches the connector. The gateway loads
+  plugin code once: after a plugin update, `hermes gateway restart`.
 - Notion, token route: `api.notion.com` with the user's connection token from the secret scope
   (`XBM_NOTION_TOKEN`). Export state (item -> page id, content hash) lives in the plugin
   database and is shared by both routes, so unchanged pages cost no request.
