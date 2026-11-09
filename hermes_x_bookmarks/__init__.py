@@ -1,13 +1,13 @@
 """hermes-x-bookmarks: read your X bookmarks, sort them with your model, keep them where you work.
 
-Official X API only (OAuth 2.0 user sign-in, read-only scopes). No scraping, no internal x.com
+Official X API only (read-only access with your own X app). No scraping, no internal x.com
 endpoints, no browser automation.
 """
 from __future__ import annotations
 
 from typing import Any
 
-__version__ = "0.0.1"
+__version__ = "0.1.0"
 
 PLUGIN_NAME = "hermes-x-bookmarks"
 

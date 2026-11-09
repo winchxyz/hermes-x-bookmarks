@@ -1,7 +1,7 @@
 manifest_version: 2
 name: hermes-x-bookmarks
-version: "0.0.1"
-description: "Hermes reads your X bookmarks (threads and Articles too), sorts them with your own model and keeps them in Notion, Google Docs or a desktop document."
+version: "0.1.0"
+description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and puts them on a board on your Desktop."
 author: winchxyz
 kind: standalone
 license: MIT
