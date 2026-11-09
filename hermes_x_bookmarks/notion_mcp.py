@@ -29,6 +29,7 @@ from .notion import (
     KINDS,
     TARGET,
     NotionResult,
+    _option,
     content_hash,
     page_id_from,
     page_properties,
@@ -42,10 +43,12 @@ BATCH = 25                  # pages per notion-create-pages call
 BATCH_CHARS = 150_000       # and at most this much Markdown per call
 PAGE_CHARS = 40_000         # Markdown per page
 TIMEOUT = 120.0
-SEED_TAGS = 30
+SEED_TAGS = 100             # the most used tags become the Tags options of a new database
+OPTIONS_META = "notion_mcp_options"
 UUID = re.compile(r"[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}", re.I)
 COLLECTION = re.compile(r"collection://([0-9a-f-]{32,36})", re.I)
-NOTION_URL = re.compile(r"https://(?:www\.)?(?:app\.)?notion\.(?:so|com)/[^\s\"'<>)\\]*", re.I)
+NOTION_URL = re.compile(r"https://(?:www\.)?(?:app\.)?notion\.(?:so|com)/[^\s\"'<>(){}\[\]\\]*",
+                        re.I)
 GONE_HINTS = ("archived", "trash", "not found", "could not find", "404", "deleted")
 
 CallMcp = Callable[..., dict[str, Any]]
@@ -54,9 +57,44 @@ CallMcp = Callable[..., dict[str, Any]]
 class McpError(RuntimeError):
     """A failed tool call; ``unavailable`` when the connector itself is not usable."""
 
-    def __init__(self, message: str, *, unavailable: bool = False) -> None:
+    def __init__(self, message: str, *, unavailable: bool = False, detail: str = "") -> None:
         super().__init__(message)
         self.unavailable = unavailable
+        self.detail = detail or message
+
+
+def notion_message(detail: str) -> str:
+    """The human part of a Notion API error the connector passes on as JSON text."""
+    text = detail
+    for _ in range(3):  # the body can be JSON inside JSON
+        try:
+            data = json.loads(text)
+        except (TypeError, ValueError):
+            break
+        if not isinstance(data, dict):
+            break
+        if isinstance(data.get("message"), str) and not isinstance(data.get("body"), str):
+            return data["message"]
+        text = data.get("body") if isinstance(data.get("body"), str) else data.get("message", "")
+    return detail
+
+
+INVALID = re.compile(r'Invalid (multi_select|select|status) value for property \\*"([^"\\]+)\\*"')
+ONE_OF = re.compile(r"one of the following:(.*)", re.S)
+QUOTED_LIST = re.compile(r'\s*("[^"]*"(?:\s*,\s*"[^"]*")*)')
+
+
+def allowed_options(detail: str) -> tuple[str, list[str]] | None:
+    """(property, allowed option names) from Notion's "Invalid select value" error."""
+    m = INVALID.search(detail)
+    tail = ONE_OF.search(detail)
+    if not m or not tail:
+        return None
+    listed = QUOTED_LIST.match(re.sub(r'\\+"', '"', tail.group(1)))
+    if not listed:
+        return None
+    names = [n for n in re.findall(r'"([^"]*)"', listed.group(1)) if n.strip()]
+    return m.group(2), list(dict.fromkeys(names))
 
 
 def setup_hint(plugin_id: str = "hermes-x-bookmarks") -> str:
@@ -83,12 +121,13 @@ class Connector:
         if not isinstance(env, dict):
             raise McpError(f"{tool}: unexpected answer from the connector")
         if not env.get("ok"):
-            msg = str(env.get("error") or "unknown error")
+            detail = str(env.get("error") or "unknown error")
+            msg = notion_message(detail)
             low = msg.lower()
             unavailable = any(s in low for s in (
                 "not connected", "unknown mcp server", "not configured", "no mcp server",
-                "not found in config", "unauthorized", "401", "login", "re-auth"))
-            raise McpError(f"{tool}: {msg[:300]}", unavailable=unavailable)
+                "not found in config", "unauthorized", "login", "re-auth"))
+            raise McpError(f"{tool}: {msg[:300]}", unavailable=unavailable, detail=detail)
         structured = env.get("structuredContent")
         result = env.get("result")
         if isinstance(result, str):
@@ -147,6 +186,8 @@ def page_markdown(item: Item, c: dict[str, Any]) -> str:
         parts.append(f"![]({c['image']})")
     if c["url"]:
         parts.append(f"<bookmark source=\"{c['url']}\"></bookmark>")
+    if c["tags"]:
+        parts.append(f"<span color=\"gray\">Tags: {escape(', '.join(c['tags']))}</span>")
     return "\n\n".join(parts)
 
 
@@ -179,10 +220,18 @@ def _q(name: str) -> str:
     return name.replace("'", "’").replace('"', "”")
 
 
+def seed_options(categories: list[str], tags: list[str]) -> dict[str, list[str]]:
+    """The select options a new database starts with (and the only ones the connector takes)."""
+    return {"Category": list(dict.fromkeys(_option(c) for c in [*categories, "Other", UNSORTED])),
+            "Tags": list(dict.fromkeys(t for t in map(_option, tags) if t)) or ["misc"],
+            "Kind": list(KINDS), "Priority": ["P1", "P2", "P3"]}
+
+
 def schema_ddl(categories: list[str], tags: list[str]) -> str:
-    cats = list(dict.fromkeys([*categories, "Other", UNSORTED]))
-    cat_opts = ", ".join(f"'{_q(c)}':{COLORS[k % len(COLORS)]}" for k, c in enumerate(cats))
-    tag_opts = ", ".join(f"'{_q(t)}':gray" for t in (tags or ["misc"]))
+    seed = seed_options(categories, tags)
+    cat_opts = ", ".join(f"'{_q(c)}':{COLORS[k % len(COLORS)]}"
+                         for k, c in enumerate(seed["Category"]))
+    tag_opts = ", ".join(f"'{_q(t)}':gray" for t in seed["Tags"])
     kinds = ", ".join(f"'{k}':default" for k in KINDS)
     return ("CREATE TABLE (\"Name\" TITLE, "
             f"\"Category\" SELECT({cat_opts}), "
@@ -208,7 +257,8 @@ def ensure_database(conn: Connector, store: Store, parent: str, categories: list
     if ds and store.get_meta("notion_parent") == parent:
         try:
             conn.call("notion-fetch", {"id": f"collection://{ds}"}, timeout=60)
-            res.url = store.get_meta("notion_database_url")
+            saved = NOTION_URL.search(store.get_meta("notion_database_url") or "")
+            res.url = saved.group(0) if saved else ""
             return ds
         except McpError as exc:
             if exc.unavailable or not _gone(exc):
@@ -242,6 +292,8 @@ def ensure_database(conn: Connector, store: Store, parent: str, categories: list
     store.set_meta("notion_database_id", db_id)
     store.set_meta("notion_data_source_id", ds)
     store.set_meta("notion_database_url", res.url)
+    store.set_meta(OPTIONS_META, json.dumps({"ds": ds,
+                                             "options": seed_options(categories, tags)}))
     if not db_id:
         res.notes.append("Boards were not created. In Notion: + Add view → Board → Group by "
                          "Category.")
@@ -278,6 +330,43 @@ def created_ids(answer: Any, exclude: set[str]) -> list[str]:
 
 
 # export ---------------------------------------------------------------------------------------
+class Options:
+    """Select and multi-select values the database accepts; the connector adds none itself.
+
+    Seeded when the plugin creates the database; for one it did not create (or after you edit
+    the options), learned from Notion's "Invalid select value ... must be one of" answers.
+    """
+
+    def __init__(self, store: Store, ds: str) -> None:
+        self.store, self.ds = store, ds
+        self.known: dict[str, list[str]] = {}
+        try:
+            saved = json.loads(store.get_meta(OPTIONS_META) or "{}")
+        except ValueError:
+            saved = {}
+        if isinstance(saved, dict) and saved.get("ds") == ds:
+            self.known = {k: list(v) for k, v in (saved.get("options") or {}).items()}
+
+    def apply(self, props: dict[str, Any]) -> dict[str, Any]:
+        out = dict(props)
+        for prop, allowed in self.known.items():
+            value = out.get(prop)
+            if isinstance(value, list):
+                out[prop] = [v for v in value if v in allowed]
+            elif isinstance(value, str) and value not in allowed:
+                out[prop] = "Other" if prop == "Category" and "Other" in allowed else None
+        return out
+
+    def learn(self, exc: McpError) -> bool:
+        """True when the error named the allowed values and they are new to us."""
+        found = allowed_options(notion_message(exc.detail)) or allowed_options(exc.detail)
+        if not found or self.known.get(found[0]) == found[1]:
+            return False
+        self.known[found[0]] = found[1]
+        self.store.set_meta(OPTIONS_META, json.dumps({"ds": self.ds, "options": self.known}))
+        return True
+
+
 def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMcp,
            limit: int | None = None, log: Callable[[str], None] | None = None,
            server: str = SERVER) -> NotionResult:
@@ -290,8 +379,9 @@ def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMc
     conn = Connector(call_mcp, server)
     rows = [(item, card(item, label)) for item, label in store.labelled_items()]
     tags = [t for t, _ in Counter(t for _, c in rows for t in c["tags"]).most_common(SEED_TAGS)]
+    cats = list(dict.fromkeys([*categories, *(c["category"] for _, c in rows)]))
     try:
-        ds = ensure_database(conn, store, page, categories, tags, res)
+        ds = ensure_database(conn, store, page, cats, tags, res)
     except McpError as exc:
         res.unavailable = exc.unavailable
         res.errors.append(str(exc))
@@ -300,19 +390,29 @@ def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMc
         return res
     target = f"{TARGET}:{ds}"
     done = store.export_map(target)
+    options = Options(store, ds)
     exclude = {ds, page, _dashed(store.get_meta("notion_database_id") or "")}
     batch: list[tuple[Item, dict[str, Any], str, str]] = []
     batch_size = BATCH
-    work = 0
+
+    def call(tool: str, args: Callable[[], dict[str, Any]], timeout: float = TIMEOUT) -> Any:
+        for _ in range(6):  # one retry per property whose options we learn
+            try:
+                return conn.call(tool, args(), timeout=timeout)
+            except McpError as exc:
+                if not options.learn(exc):
+                    raise
+        return conn.call(tool, args(), timeout=timeout)
 
     def flush() -> None:
         nonlocal batch_size
         if not batch:
             return
-        pages = [{"properties": props, "content": md} for _, props, md, _ in batch]
-        answer = conn.call("notion-create-pages", {
+        answer = call("notion-create-pages", lambda: {
             "parent": {"type": "data_source_id", "data_source_id": ds},
-            "pages": pages, "allow_async": False})
+            "pages": [{"properties": options.apply(props), "content": md}
+                      for _, props, md, _ in batch],
+            "allow_async": False})
         ids = created_ids(answer, exclude)
         if len(ids) != len(batch):
             if len(batch) == 1:
@@ -326,27 +426,34 @@ def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMc
             store.save_export(target, it.id, pid, h)
             res.created += 1
         batch.clear()
+        if log:
+            log(f"Notion: {res.created + res.updated} page(s) written...")
 
+    todo: list[tuple[Item, dict[str, Any], str, tuple[str, str] | None]] = []
+    for item, c in rows:
+        h = content_hash(page_properties(c))
+        known = done.get(item.id)
+        if known and known[1] == GONE:
+            res.skipped_deleted += 1
+        elif known and known[1] == h:
+            res.unchanged += 1
+        elif known and not known[0]:  # created earlier without a page id: cannot update it
+            store.save_export(target, item.id, "", h)
+            res.unchanged += 1
+        else:
+            todo.append((item, c, h, known))
+    if limit is not None and len(todo) > limit:
+        res.left += len(todo) - limit
+        todo = todo[:limit]
+    pos = 0
     try:
-        for item, c in rows:
-            h = content_hash(page_properties(c))
-            known = done.get(item.id)
-            if known and known[1] == GONE:
-                res.skipped_deleted += 1
-                continue
-            if known and known[1] == h:
-                res.unchanged += 1
-                continue
-            if limit is not None and work >= limit:
-                res.left += 1
-                continue
-            work += 1
+        for pos, (item, c, h, known) in enumerate(todo):  # noqa: B007 - pos is read after
             props = mcp_properties(c)
-            if known and known[0]:
+            if known:
                 try:
-                    conn.call("notion-update-page", {"page_id": known[0],
-                                                     "command": "update_properties",
-                                                     "properties": props}, timeout=60)
+                    call("notion-update-page", lambda pid=known[0], p=props: {
+                        "page_id": pid, "command": "update_properties",
+                        "properties": options.apply(p)}, timeout=60)
                     store.save_export(target, item.id, known[0], h)
                     res.updated += 1
                 except McpError as exc:
@@ -357,24 +464,20 @@ def export(store: Store, *, parent: str, categories: list[str], call_mcp: CallMc
                         res.skipped_deleted += 1
                     else:
                         res.errors.append(f"post {item.id}: {exc}")
-                continue
-            if known:  # created earlier without a page id: cannot update it
-                store.save_export(target, item.id, "", h)
-                res.unchanged += 1
+                        if len(res.errors) >= 5:
+                            raise
                 continue
             md = page_markdown(item, c)
             if batch and (len(batch) >= batch_size
                           or sum(len(b[2]) for b in batch) + len(md) > BATCH_CHARS):
                 flush()
             batch.append((item, props, md, h))
-            if log and work % 50 == 0:
-                log(f"Notion: {work} page(s) written...")
-            if len(res.errors) >= 5:
-                break
+        pos = len(todo)
         flush()
     except McpError as exc:
-        res.left += len(batch)
-        res.errors.append(str(exc))
+        res.left += len(batch) + (len(todo) - pos)
+        if str(exc) not in " ".join(res.errors):
+            res.errors.append(str(exc))
         if exc.unavailable:
             res.errors.append(setup_hint())
     return res

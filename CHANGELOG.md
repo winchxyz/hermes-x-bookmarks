@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.2 (2026-11-09)
+
+Fixes from the first live run of the Notion connector.
+
+- Notion's connector accepts only tags, categories and kinds that already exist in the
+  database. New databases start with your 100 most used tags and all your categories; values
+  Notion does not know are left out of the property (learned from Notion's answer, retried) and
+  every page lists all its tags at the bottom. The database's options are never rewritten.
+- The database link no longer ends in `}}`; "more to go" counts every page not yet written.
+
 ## 0.2.1 (2026-11-09)
 
 Notion through Hermes' own Notion connector.

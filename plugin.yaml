@@ -1,6 +1,6 @@
 manifest_version: 2
 name: hermes-x-bookmarks
-version: "0.2.1"
+version: "0.2.2"
 description: "Hermes reads your X bookmarks (long posts and Articles too), sorts them with your own model and exports them to a Desktop board, Obsidian, Notion or Google Docs."
 author: winchxyz
 kind: standalone

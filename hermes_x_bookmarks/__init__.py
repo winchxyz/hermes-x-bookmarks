@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 PLUGIN_NAME = "hermes-x-bookmarks"
 

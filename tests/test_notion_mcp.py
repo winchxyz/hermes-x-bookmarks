@@ -57,7 +57,8 @@ class FakeMcp:
 
 
 def run(store, fake, **kw):
-    return notion_mcp.export(store, parent=PAGE, categories=["AI & agents"], call_mcp=fake, **kw)
+    return notion_mcp.export(store, parent=PAGE, categories=["AI & agents", "Coding & dev tools"],
+                             call_mcp=fake, **kw)
 
 
 def test_creates_database_boards_and_pages_in_one_batch():
@@ -102,7 +103,41 @@ def test_second_run_sends_nothing_and_changes_go_through_update_properties():
     upd = fake.calls[-1][2]
     assert upd["command"] == "update_properties" and "Status" not in upd["properties"]
     assert upd["properties"]["Category"] == "Coding & dev tools"
-    assert upd["properties"]["Tags"] == ["python"]
+    assert upd["properties"]["Tags"] == []  # "python" is not an option of this database
+
+
+def notion_400(prop, bad, allowed):
+    """The error exactly as the hosted Notion MCP passes it through Hermes (JSON in JSON)."""
+    listed = ", ".join(f'"{a}"' for a in allowed)
+    body = json.dumps({"object": "error", "status": 400, "code": "validation_error",
+                       "message": f'pages[0]: Invalid multi_select value for property "{prop}": '
+                                  f'"{bad}". Value must be one of the following: {listed}'})
+    return json.dumps({"name": "APIResponseError", "code": "validation_error", "status": 400,
+                       "headers": {}, "body": body})
+
+
+def test_unknown_tags_are_learned_from_notions_answer_and_left_out():
+    store = filled_store()
+    store.set_meta("notion_parent", "0123abcd-0123-4567-89ab-0123456789ab")
+    store.set_meta("notion_data_source_id", DS)  # a database the plugin did not seed
+    fake = FakeMcp(fail={"notion-create-pages": notion_400("Tags", "grok-bots", ["ai", "x"])})
+    res = run(store, fake)
+    assert res.created == 3 and not res.errors, res.lines()
+    retry = fake.calls[-1][2]["pages"]
+    assert all(set(p["properties"]["Tags"]) <= {"ai", "x"} for p in retry)
+    assert json.loads(store.get_meta("notion_mcp_options"))["options"]["Tags"] == ["ai", "x"]
+
+
+def test_error_text_and_database_url_are_clean():
+    detail = notion_400("Tags", "a", ["b"])
+    assert notion_mcp.notion_message(detail).startswith("pages[0]: Invalid multi_select")
+    assert notion_mcp.allowed_options(detail) == ("Tags", ["b"])
+    two = notion_400("Tags", "a", ["b", "c d"])
+    assert notion_mcp.allowed_options(two) == ("Tags", ["b", "c d"])
+    clean = notion_mcp.notion_message(notion_400("Category", "z", ["AI", "Other"]))
+    assert notion_mcp.allowed_options(clean) == ("Category", ["AI", "Other"])
+    m = notion_mcp.NOTION_URL.search('{"url":"https://app.notion.com/p/cde1c5cf10304b62a220d7d5a84907e0}}')
+    assert m.group(0) == "https://app.notion.com/p/cde1c5cf10304b62a220d7d5a84907e0"
 
 
 def test_page_deleted_in_notion_is_left_out():
