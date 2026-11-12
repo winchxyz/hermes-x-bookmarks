@@ -158,5 +158,5 @@ def build(store: Store, llm: Any = None, *, days: int = DAYS, language: str = "E
     store.save_digest(since, ids, text)
     if usage:
         run = store.start_run("digest")
-        store.finish_run(run, "ok", cost=json.dumps(usage))
+        store.finish_run(run, "ok", cost=usage)
     return DigestResult(text=text, item_ids=ids, new=len(cards), llm_note=note, usage=usage)
