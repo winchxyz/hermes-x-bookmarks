@@ -344,7 +344,7 @@ class Store:
     def llm_totals(self) -> dict[str, Any]:
         tot = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "llm_cost_usd": 0.0}
         for r in self.conn.execute("SELECT cost FROM runs WHERE kind = 'classify'"):
-            c = json.loads(r["cost"] or "{}")
+            c = _load_cost(r["cost"])
             for k in tot:
                 tot[k] += c.get(k) or 0
         return tot
@@ -367,8 +367,8 @@ class Store:
     def update_run(self, run_id: int, **fields: Any) -> None:
         allowed = {"status", "pages", "fetched", "new", "stop_reason", "cost", "error",
                    "finished_at"}
-        cols = {k: (json.dumps(v) if k == "cost" else v) for k, v in fields.items()
-                if k in allowed}
+        cols = {k: (json.dumps(v) if k == "cost" and not isinstance(v, str) else v)
+                for k, v in fields.items() if k in allowed}
         if not cols:
             return
         sets = ", ".join(f"{k} = ?" for k in cols)
@@ -384,9 +384,21 @@ class Store:
         out = []
         for r in rows:
             d = dict(r)
-            d["cost"] = json.loads(d.get("cost") or "{}")
+            d["cost"] = _load_cost(d.get("cost"))
             out.append(d)
         return out
+
+
+def _load_cost(value: Any) -> dict[str, Any]:
+    """Read Runs.cost as a dict; heals the double-encoded rows 0.3.0 digests wrote."""
+    for _ in range(3):
+        if not isinstance(value, str):
+            break
+        try:
+            value = json.loads(value)
+        except (TypeError, ValueError):
+            return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _dumps(item: Item) -> str:
